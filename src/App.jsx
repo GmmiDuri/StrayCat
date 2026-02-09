@@ -130,7 +130,7 @@ function App() {
     return (
         <div className="app-container">
             <header>
-                <h1>🐈 길냥이 지도 (React)</h1>
+                <h1>🐈 길냥이 지도</h1>
                 <p>
                     {isAdding
                         ? "📍 지도의 원하는 위치를 클릭하여 등록을 시작하세요"
