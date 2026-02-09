@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { db } from './firebase';
+import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy } from "firebase/firestore";
 
 // Custom Marker Icon
 const catIcon = new L.DivIcon({
@@ -10,22 +12,24 @@ const catIcon = new L.DivIcon({
     iconAnchor: [15, 15],
 });
 
-function MapEvents({ onMapClick, isAdding }) {
+function MapEvents({ onMapClick, isAdding, setIsAdding }) {
     useMapEvents({
         click(e) {
             if (isAdding) {
                 onMapClick(e.latlng);
             }
         },
+        keydown(e) {
+            if (e.originalEvent.key === 'Escape') {
+                setIsAdding(false);
+            }
+        }
     });
     return null;
 }
 
 function App() {
-    const [cats, setCats] = useState(() => {
-        const saved = localStorage.getItem('stray_cats_react');
-        return saved ? JSON.parse(saved) : [];
-    });
+    const [cats, setCats] = useState([]);
     const [isAdding, setIsAdding] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [showToast, setShowToast] = useState(false);
@@ -42,9 +46,18 @@ function App() {
         foundTime: '12:00'
     });
 
+    // 1. 데이터 불러오기 (실시간 업데이트 버전)
     useEffect(() => {
-        localStorage.setItem('stray_cats_react', JSON.stringify(cats));
-    }, [cats]);
+        const q = query(collection(db, "cats"), orderBy("id", "desc"));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const catArray = [];
+            querySnapshot.forEach((doc) => {
+                catArray.push({ ...doc.data(), firestoreId: doc.id });
+            });
+            setCats(catArray);
+        });
+        return () => unsubscribe(); // 컴포넌트 닫힐 때 연결 해제
+    }, []);
 
     const handleManualAdd = () => {
         setIsAdding(true);
@@ -91,40 +104,41 @@ function App() {
         setShowModal(true);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (editingId) {
-            // Update existing cat
-            setCats(cats.map(cat =>
-                cat.id === editingId
-                    ? { ...cat, ...formData }
-                    : cat
-            ));
-        } else {
-            // Add new cat
-            const newCat = {
-                ...formData,
-                id: Date.now(),
-                lat: tempCoords.lat,
-                lng: tempCoords.lng,
-            };
-            setCats([...cats, newCat]);
+        try {
+            if (editingId) {
+                // 수정 모드
+                const catRef = doc(db, "cats", cats.find(c => c.id === editingId).firestoreId);
+                await updateDoc(catRef, formData);
+            } else {
+                // 새 등록 모드
+                await addDoc(collection(db, "cats"), {
+                    ...formData,
+                    id: Date.now(),
+                    lat: tempCoords.lat,
+                    lng: tempCoords.lng,
+                    createdAt: new Date()
+                });
+            }
+            setShowModal(false);
+            setShowToast(true);
+            setFormData({
+                name: '',
+                desc: '',
+                condition: '좋음',
+                neutered: '확인됨(TNR 완료)',
+                photo: '',
+                foundDate: new Date().toISOString().split('T')[0],
+                foundTime: '12:00'
+            });
+            setEditingId(null);
+            setTimeout(() => setShowToast(false), 3000);
+        } catch (error) {
+            console.error("Error saving document: ", error);
+            alert("저장에 실패했습니다. 콘솔을 확인해주세요.");
         }
-
-        setShowModal(false);
-        setShowToast(true);
-        setFormData({
-            name: '',
-            desc: '',
-            condition: '좋음',
-            neutered: '확인됨(TNR 완료)',
-            photo: '',
-            foundDate: new Date().toISOString().split('T')[0],
-            foundTime: '12:00'
-        });
-        setEditingId(null);
-        setTimeout(() => setShowToast(false), 3000);
     };
 
     return (
@@ -152,7 +166,7 @@ function App() {
                         attribution='&copy; <a href="http://www.vworld.kr/">vworld</a>'
                         className="monochrome-tile"
                     />
-                    <MapEvents onMapClick={handleMapClick} isAdding={isAdding} />
+                    <MapEvents onMapClick={handleMapClick} isAdding={isAdding} setIsAdding={setIsAdding} />
 
                     {cats.map((cat) => (
                         <Marker key={cat.id} position={[cat.lat, cat.lng]} icon={catIcon}>
