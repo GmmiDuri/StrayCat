@@ -1,16 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import React, { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { db } from './firebase';
 import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy, arrayUnion } from "firebase/firestore";
+import { translations } from './translations';
+import 'leaflet/dist/leaflet.css';
+import './index.css';
 
 // Custom Marker Icon
 const catIcon = new L.DivIcon({
     className: 'custom-cat-icon',
-    html: `<div style="background: white; border: 2px solid #ff9f43; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">🐱</div>`,
+    html: `<div style="background: white; border: 2px solid #FFD700; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">🐱</div>`,
     iconSize: [30, 30],
     iconAnchor: [15, 15],
 });
+
+// Component to handle map FlyTo actions
+// Component to handle map FlyTo actions
+function MapController({ selectedCat, markersRef, searchResult }) {
+    const map = useMap();
+    useEffect(() => {
+        if (selectedCat && markersRef.current[selectedCat.id]) {
+            map.flyTo([selectedCat.lat, selectedCat.lng], 16, {
+                duration: 1.5
+            });
+            const marker = markersRef.current[selectedCat.id];
+            if (marker) {
+                // Determine if we should open popup based on screen size or just let standard behavior work
+                // On mobile, we use bottom sheet, so no popup. On desktop, we want popup.
+                if (window.innerWidth >= 768) {
+                    setTimeout(() => marker.openPopup(), 1500);
+                }
+            }
+        }
+    }, [selectedCat, map, markersRef]);
+
+    useEffect(() => {
+        if (searchResult) {
+            map.flyTo([searchResult.lat, searchResult.lng], 15, {
+                duration: 1.5
+            });
+        }
+    }, [searchResult, map]);
+
+    return null;
+}
 
 function MapEvents({ onMapClick, isAdding, setIsAdding }) {
     useMapEvents({
@@ -35,6 +69,54 @@ function App() {
     const [showToast, setShowToast] = useState(false);
     const [tempCoords, setTempCoords] = useState(null);
     const [editingId, setEditingId] = useState(null); // Track which cat is being edited
+    const [lang, setLang] = useState('ko'); // Language state: 'ko' or 'en'
+
+    // Urgent Fix: Missing States
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+    // New State for Responsive UI
+    const [selectedCat, setSelectedCat] = useState(null);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const markersRef = useRef({});
+
+    const t = translations[lang];
+
+    const toggleLang = () => {
+        setLang(prev => prev === 'ko' ? 'en' : 'ko');
+    };
+
+    // Cat Search State (Sidebar)
+    const [catSearchQuery, setCatSearchQuery] = useState('');
+
+    // Search State (Location)
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResult, setSearchResult] = useState(null);
+
+    const handleSearch = async () => {
+        if (!searchQuery.trim()) return;
+
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
+            const data = await response.json();
+
+            if (data && data.length > 0) {
+                const { lat, lon } = data[0];
+                setSearchResult({ lat: parseFloat(lat), lng: parseFloat(lon), timestamp: Date.now() });
+            } else {
+                alert(t.searchNoResult || "장소를 찾을 수 없습니다.");
+            }
+        } catch (error) {
+            console.error("Search failed:", error);
+            alert("검색 중 오류가 발생했습니다.");
+        }
+    };
+
+    // Handle Resize
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -43,7 +125,6 @@ function App() {
         neutered: '확인됨(TNR 완료)',
         photo: '',
         foundDate: new Date().toISOString().split('T')[0],
-        foundTime: '12:00',
         foundTime: '12:00',
         needs: '없음', // '중성화 필요', '즉시 치료 필요', '주기적 길냥이 집사 필요', '직접 입력', '없음'
         customNeeds: '',
@@ -136,6 +217,10 @@ function App() {
         setShowModal(true);
     };
 
+    const handleMarkerClick = (cat) => {
+        setSelectedCat(cat);
+    };
+
     const handleOpenHelpModal = (cat) => {
         setCurrentCat(cat);
         setHelpForm({ phone: '' });
@@ -156,10 +241,10 @@ function App() {
                 })
             });
             setShowHelpModal(false);
-            alert("도움을 주셔서 감사합니다! 🐾 연락처가 등록되었습니다.");
+            alert(t.alertThanks);
         } catch (error) {
             console.error("Error updating helpers:", error);
-            alert("오류가 발생했습니다.");
+            alert(t.alertError);
         }
     };
 
@@ -187,10 +272,10 @@ function App() {
                 })
             });
             setShowCareModal(false);
-            alert("돌봄 기록이 등록되었습니다! 🍚💧");
+            alert(t.alertCare);
         } catch (error) {
             console.error("Error updating care history:", error);
-            alert("오류가 발생했습니다.");
+            alert(t.alertError);
         }
     };
 
@@ -232,163 +317,247 @@ function App() {
             setTimeout(() => setShowToast(false), 3000);
         } catch (error) {
             console.error("Error saving document: ", error);
-            alert("저장에 실패했습니다. 콘솔을 확인해주세요.");
+            alert(t.alertSaveError);
         }
     };
 
+    const renderCatDetails = (cat) => (
+        <div className="cat-details-content">
+            {cat.photo && <img src={cat.photo} alt={cat.name} className="cat-detail-img" />}
+            <h3>{cat.name}</h3>
+            <p className="cat-detail-meta">
+                {t.foundAt} {cat.foundDate} {cat.foundTime}
+            </p>
+            <p className="cat-detail-desc">{cat.desc}</p>
+            <div className="cat-badges">
+                <span className="badge">{t.status}: {cat.condition}</span>
+                <span className="badge">{t.tnr}: {cat.neutered}</span>
+            </div>
+            <div className="cat-needs-section">
+                {cat.needs && cat.needs !== '없음' && (
+                    <div className="needs-box">
+                        {cat.needs === '중성화 필요' || cat.needs === '즉시 치료 필요' ? (
+                            <>
+                                <span className="needs-urgent">{t.helpReq}</span>
+                                <div className="needs-text">
+                                    {cat.needs} ({cat.helpers || 0}{t.helpers})
+                                </div>
+                                {cat.helpersList && cat.helpersList.length > 0 && (
+                                    <div className="helpers-list">
+                                        <strong>{t.helpersList}</strong>
+                                        <ul>
+                                            {cat.helpersList.map((helper, idx) => (
+                                                <li key={idx}>{helper.phone}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => handleOpenHelpModal(cat)}
+                                    className="action-btn help-btn"
+                                >
+                                    {t.btnHelp}
+                                </button>
+                            </>
+                        ) : cat.needs === '주기적 길냥이 집사 필요' ? (
+                            <>
+                                <span className="care-req-title">{t.careReq}</span>
+                                <div className="needs-text">
+                                    {cat.needs} ({cat.caretakers || 0}{t.careCount})
+                                </div>
+                                {cat.careHistory && cat.careHistory.length > 0 && (
+                                    <div
+                                        className="care-history"
+                                        onClick={() => setShowHistoryModal(true)}
+                                        style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                                    >
+                                        {t.lastMeal} {cat.careHistory[cat.careHistory.length - 1].date} {cat.careHistory[cat.careHistory.length - 1].time}
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => handleOpenCareModal(cat)}
+                                    className="action-btn care-btn"
+                                >
+                                    {t.btnRecordCare}
+                                </button>
+                            </>
+                        ) : cat.needs === '직접 입력' ? (
+                            <>
+                                <strong>{t.otherNeeds}</strong> {cat.customNeeds}
+                            </>
+                        ) : (
+                            <span>{cat.needs}</span>
+                        )}
+                    </div>
+                )}
+            </div>
+            {cat.phone && (
+                <div className="contact-box">
+                    📞 {cat.phone}
+                </div>
+            )}
+            <button
+                onClick={() => handleEdit(cat)}
+                className="edit-btn"
+            >
+                {t.btnEdit}
+            </button>
+        </div>
+    );
+
     return (
         <div className="app-container">
-            <header>
-                <h1>🐈 길냥이 지도</h1>
-                <p>
-                    {isAdding
-                        ? "📍 지도의 원하는 위치를 클릭하여 등록을 시작하세요"
-                        : "새로운 길냥이를 등록하고 싶다면 아래에 '새로운 길냥이 등록' 버튼을 누른 후 지도를 클릭해주세요"}
-                </p>
-            </header>
+            <button className="lang-toggle" onClick={toggleLang}>
+                {lang === 'ko' ? 'English' : '한국어'}
+            </button>
 
-            <div className={`map-wrapper ${isAdding ? 'cursor-crosshair' : ''}`}>
+            {/* Sidebar (Desktop Only via CSS) */}
+            <aside className="sidebar">
+                <div className="sidebar-header">
+                    <h1>{t.appTitle}</h1>
+                    <p>{t.headerDescDefault}</p>
+                    <div className="sidebar-search">
+                        <input
+                            type="text"
+                            placeholder={t.catSearchPlaceholder}
+                            value={catSearchQuery}
+                            onChange={(e) => setCatSearchQuery(e.target.value)}
+                        />
+                    </div>
+                </div>
+                <div className="cat-list">
+                    {cats
+                        .filter(cat => cat.name.toLowerCase().includes(catSearchQuery.toLowerCase()))
+                        .map(cat => (
+                            <div key={cat.id} className="cat-card" onClick={() => setSelectedCat(cat)}>
+                                <div className="cat-info-row">
+                                    <span className="cat-label">{t.labelName}:</span>
+                                    <span className="cat-value"><strong>{cat.name}</strong></span>
+                                </div>
+                                <div className="cat-info-row">
+                                    <span className="cat-label">{t.labelFirstFound}:</span>
+                                    <span className="cat-value">{cat.foundDate}</span>
+                                </div>
+                                <div className="cat-info-row">
+                                    <span className="cat-label">{t.labelDesc}:</span>
+                                    <span className="cat-value desc-text">{cat.desc}</span>
+                                </div>
+                                <div className="cat-info-row">
+                                    <span className="cat-label">{t.labelStatusSidebar}:</span>
+                                    <span className="cat-value">
+                                        <span className={`status-dot ${cat.condition === '좋음' ? 'good' : 'bad'}`}></span>
+                                        {cat.condition}
+                                    </span>
+                                </div>
+                                {cat.needs && cat.needs !== '없음' && cat.needs !== 'None' && (
+                                    <div className="cat-info-row needs-row">
+                                        <span className="cat-label">{t.labelNeeds}:</span>
+                                        <span className="cat-value needs-text">
+                                            {cat.needs === '직접 입력' || cat.needs === 'Custom Input' ? cat.customNeeds : cat.needs}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    {cats.filter(cat => cat.name.toLowerCase().includes(catSearchQuery.toLowerCase())).length === 0 && (
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                            {lang === 'en' ? 'No cats found.' : '검색 결과가 없습니다.'}
+                        </div>
+                    )}
+                </div>
+            </aside>
+
+            <div className="map-wrapper">
                 <MapContainer
-                    center={[36.5, 127.8]}
-                    zoom={7}
-                    minZoom={6}
+                    center={[37.5708, 126.9801]}
+                    zoom={17}
+                    minZoom={15}
                     maxBounds={[[33, 124], [43, 132]]}
                     id="map-container"
+                    className={isAdding ? 'cursor-crosshair' : ''}
+                    zoomControl={false}
                 >
+                    {/* 1. Base Layer: Clean Background (No Labels) */}
                     <TileLayer
-                        url="https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="http://www.vworld.kr/">vworld</a>'
-                        className="monochrome-tile"
+                        url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+                        attribution='&copy; OpenStreetMap'
+                        className="map-base-layer"
+                        zIndex={1}
+                    />
+
+                    {/* 2. Label Layer: Crisp Text Overlay */}
+                    <TileLayer
+                        url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+                        className="map-label-layer"
+                        zIndex={100}
                     />
                     <MapEvents onMapClick={handleMapClick} isAdding={isAdding} setIsAdding={setIsAdding} />
+                    <MapController selectedCat={selectedCat} markersRef={markersRef} searchResult={searchResult} />
 
                     {cats.map((cat) => (
-                        <Marker key={cat.id} position={[cat.lat, cat.lng]} icon={catIcon}>
-                            <Popup>
-                                <div className="cat-popup">
-                                    {cat.photo && <img src={cat.photo} alt={cat.name} />}
-                                    <h3>{cat.name}</h3>
-                                    <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '5px' }}>
-                                        🕒 (첫 발견 시기) {cat.foundDate} {cat.foundTime}
-                                    </p>
-                                    <p>{cat.desc}</p>
-                                    <div style={{ marginTop: '10px', marginBottom: '10px' }}>
-                                        <span className="badge">Status: {cat.condition}</span>
-                                        <span className="badge">TNR: {cat.neutered}</span>
+                        <Marker
+                            key={cat.id}
+                            position={[cat.lat, cat.lng]}
+                            icon={catIcon}
+                            ref={el => markersRef.current[cat.id] = el}
+                            eventHandlers={{
+                                click: () => handleMarkerClick(cat)
+                            }}
+                        >
+                            {/* Only render Popup on Desktop because Mobile uses Bottom Sheet */}
+                            {!isMobile && (
+                                <Popup>
+                                    <div className="cat-popup">
+                                        {renderCatDetails(cat)}
                                     </div>
-                                    <div style={{ marginBottom: '10px' }}>
-                                        {cat.needs && cat.needs !== '없음' && (
-                                            <div style={{ padding: '8px', background: '#ffe4c4', borderRadius: '5px', fontSize: '0.9rem' }}>
-                                                {cat.needs === '중성화 필요' || cat.needs === '즉시 치료 필요' ? (
-                                                    <>
-                                                        <span style={{ color: '#d35400', fontWeight: 'bold' }}>🆘 집사 도움 요청</span>
-                                                        <div style={{ marginTop: '5px' }}>
-                                                            {cat.needs} ({cat.helpers || 0}명 참여 중)
-                                                        </div>
-                                                        {cat.helpersList && cat.helpersList.length > 0 && (
-                                                            <div style={{ marginTop: '5px', fontSize: '0.8rem', background: '#fff', padding: '5px', borderRadius: '3px' }}>
-                                                                <strong>📞 도움 주시는 분들:</strong>
-                                                                <ul style={{ margin: '5px 0 0 0', paddingLeft: '15px' }}>
-                                                                    {cat.helpersList.map((helper, idx) => (
-                                                                        <li key={idx}>{helper.phone}</li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        )}
-                                                        <button
-                                                            onClick={() => handleOpenHelpModal(cat)}
-                                                            style={{
-                                                                marginTop: '5px',
-                                                                width: '100%',
-                                                                padding: '5px',
-                                                                background: '#ff7675',
-                                                                color: 'white',
-                                                                border: 'none',
-                                                                borderRadius: '3px',
-                                                                cursor: 'pointer'
-                                                            }}
-                                                        >
-                                                            🙌 도움 주기
-                                                        </button>
-                                                    </>
-                                                ) : cat.needs === '주기적 길냥이 집사 필요' ? (
-                                                    <>
-                                                        <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>🏠 집사 모집 중</span>
-                                                        <div style={{ marginTop: '5px' }}>
-                                                            {cat.needs} ({cat.caretakers || 0}회 돌봄)
-                                                        </div>
-                                                        {cat.careHistory && cat.careHistory.length > 0 && (
-                                                            <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '3px' }}>
-                                                                🥣 최근 식사: {cat.careHistory[cat.careHistory.length - 1].date} {cat.careHistory[cat.careHistory.length - 1].time}
-                                                            </div>
-                                                        )}
-                                                        <button
-                                                            onClick={() => handleOpenCareModal(cat)}
-                                                            style={{
-                                                                marginTop: '5px',
-                                                                width: '100%',
-                                                                padding: '5px',
-                                                                background: '#55efc4',
-                                                                color: '#2d3436',
-                                                                border: 'none',
-                                                                borderRadius: '3px',
-                                                                cursor: 'pointer'
-                                                            }}
-                                                        >
-                                                            🍚 밥/물 줬어요 (기록)
-                                                        </button>
-                                                    </>
-                                                ) : cat.needs === '직접 입력' ? (
-                                                    <>
-                                                        <strong>기타 필요사항:</strong> {cat.customNeeds}
-                                                    </>
-                                                ) : (
-                                                    <span>{cat.needs}</span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div style={{ marginBottom: '10px' }}>
-                                        {cat.phone && (
-                                            <div style={{ padding: '5px', background: '#e1f5fe', borderRadius: '5px', fontSize: '0.8rem', color: '#0288d1' }}>
-                                                📞 {cat.phone}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={() => handleEdit(cat)}
-                                        style={{
-                                            width: '100%',
-                                            padding: '5px',
-                                            background: '#eee',
-                                            border: 'none',
-                                            borderRadius: '5px',
-                                            cursor: 'pointer',
-                                            fontSize: '0.8rem'
-                                        }}
-                                    >
-                                        ✏️ 정보 수정
-                                    </button>
-                                </div>
-                            </Popup>
+                                </Popup>
+                            )}
                         </Marker>
                     ))}
                 </MapContainer>
 
-                <div className="controls">
-                    <button className="add-btn" onClick={handleManualAdd}>
-                        🐾 새로운 길냥이 등록
+                <div className="search-container">
+                    <input
+                        type="text"
+                        className="search-input"
+                        placeholder={t.searchPlaceholder || "Search location..."}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    />
+                    <button className="search-btn" onClick={handleSearch}>
+                        🔍
                     </button>
                 </div>
+
+                <div className="fab-container">
+                    <button className="add-fab" onClick={handleManualAdd}>
+                        <span>+</span>
+                    </button>
+                    {isAdding && <div className="fab-tooltip">{t.headerDescAdding}</div>}
+                </div>
+
+                {/* Mobile Bottom Sheet */}
+                {isMobile && selectedCat && (
+                    <div className="bottom-sheet-overlay" onClick={() => setSelectedCat(null)}>
+                        <div className="bottom-sheet" onClick={(e) => e.stopPropagation()}>
+                            <div className="sheet-handle"></div>
+                            <div className="sheet-content">
+                                {renderCatDetails(selectedCat)}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h2>{editingId ? '📝 길냥이 정보 수정' : '🏠 길냥이 제보하기'}</h2>
+                        <button className="modal-close-btn" onClick={() => setShowModal(false)}>✕</button>
+                        <h2>{editingId ? t.editTitle : t.addTitle}</h2>
                         <form onSubmit={handleSubmit}>
                             <div className="form-group">
-                                <label>이름</label>
+                                <label>{t.labelName}</label>
                                 <input
                                     type="text" required
                                     value={formData.name}
@@ -396,36 +565,36 @@ function App() {
                                 />
                             </div>
                             <div className="form-group">
-                                <label>특징</label>
+                                <label>{t.labelDesc}</label>
                                 <textarea
                                     required
-                                    placeholder="ex) 고등어, 오른쪽 눈 다침"
+                                    placeholder={t.placeholderDesc}
                                     value={formData.desc}
                                     onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
                                 ></textarea>
                             </div>
                             <div className="form-group">
-                                <label>필요사항</label>
+                                <label>{t.labelNeeds}</label>
                                 <select
                                     value={formData.needs}
                                     onChange={(e) => setFormData({ ...formData, needs: e.target.value })}
                                 >
-                                    <option value="없음">없음(선택 안 함)</option>
-                                    <option value="중성화 필요">중성화 필요</option>
-                                    <option value="즉시 치료 필요">즉시 치료 필요</option>
-                                    <option value="주기적 길냥이 집사 필요">주기적 길냥이 집사 필요</option>
-                                    <option value="직접 입력">직접 입력</option>
+                                    <option value="없음">{t.optNone}</option>
+                                    <option value="중성화 필요">{t.optNeuter}</option>
+                                    <option value="즉시 치료 필요">{t.optTreat}</option>
+                                    <option value="주기적 길냥이 집사 필요">{t.optCare}</option>
+                                    <option value="직접 입력">{t.optCustom}</option>
                                 </select>
                                 {formData.needs === '중성화 필요' && (
                                     <p style={{ marginTop: '5px', fontSize: '0.8rem', color: '#e17055' }}>
-                                        📢 중성화 전 해당 구청 담당부서에 지원 문의를 해보세요!
+                                        {t.noticeNeuter}
                                     </p>
                                 )}
                                 {formData.needs === '직접 입력' && (
                                     <input
                                         type="text"
                                         style={{ marginTop: '5px' }}
-                                        placeholder="필요한 사항을 직접 입력해주세요"
+                                        placeholder={t.labelCustomNeeds}
                                         required
                                         value={formData.customNeeds}
                                         onChange={(e) => setFormData({ ...formData, customNeeds: e.target.value })}
@@ -434,7 +603,7 @@ function App() {
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                 <div className="form-group">
-                                    <label>발견 날짜</label>
+                                    <label>{t.labelFoundDate}</label>
                                     <input
                                         type="date"
                                         required
@@ -443,7 +612,7 @@ function App() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>발견 시간</label>
+                                    <label>{t.labelFoundTime}</label>
                                     <select
                                         required
                                         value={formData.foundTime}
@@ -458,28 +627,28 @@ function App() {
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                 <div className="form-group">
-                                    <label>영양 상태</label>
+                                    <label>{t.labelCondition}</label>
                                     <select
                                         required
                                         value={formData.condition}
                                         onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
                                     >
-                                        <option>좋음</option><option>보통</option><option>마름</option>
+                                        <option value="좋음">{t.optGood}</option><option value="보통">{t.optAvg}</option><option value="마름">{t.optThin}</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>중성화</label>
+                                    <label>{t.labelNeutered}</label>
                                     <select
                                         required
                                         value={formData.neutered}
                                         onChange={(e) => setFormData({ ...formData, neutered: e.target.value })}
                                     >
-                                        <option>확인됨(TNR 완료)</option><option>미완료</option><option>모름</option>
+                                        <option value="확인됨(TNR 완료)">{t.optVerified}</option><option value="미완료">{t.optNotDone}</option><option value="모름">{t.optUnknown}</option>
                                     </select>
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label>사진 URL (선택)</label>
+                                <label>{t.labelPhoto}</label>
                                 <input
                                     type="url"
                                     value={formData.photo}
@@ -487,16 +656,16 @@ function App() {
                                 />
                             </div>
                             <div className="form-group">
-                                <label>작성자 연락처 (선택)</label>
+                                <label>{t.labelPhone}</label>
                                 <input
                                     type="tel"
-                                    placeholder="(동물병원에 다른 집사와 함께 즉시 방문이 필요한 경우 등 입력)"
+                                    placeholder={t.placeholderPhone}
                                     value={formData.phone}
                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                 />
                             </div>
                             <button type="submit" className="submit-btn">
-                                {editingId ? '수정 완료' : '제보 완료'}
+                                {editingId ? t.submitUpdate : t.submitAdd}
                             </button>
                         </form>
                     </div>
@@ -506,13 +675,13 @@ function App() {
             {showCareModal && (
                 <div className="modal-overlay" onClick={() => setShowCareModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '300px' }}>
-                        <h3>🍚 돌봄 기록 남기기</h3>
+                        <h3>{t.careTitle}</h3>
                         <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>
-                            오늘 길냥이에게 맛있는 밥과 물을 주셨나요? 시간을 기록해주세요!
+                            {t.careDesc}
                         </p>
                         <form onSubmit={handleSubmitCare}>
                             <div className="form-group">
-                                <label>날짜</label>
+                                <label>{t.labelDate}</label>
                                 <input
                                     type="date"
                                     required
@@ -521,7 +690,7 @@ function App() {
                                 />
                             </div>
                             <div className="form-group">
-                                <label>시간</label>
+                                <label>{t.labelTime}</label>
                                 <input
                                     type="time"
                                     required
@@ -530,7 +699,7 @@ function App() {
                                 />
                             </div>
                             <button type="submit" className="submit-btn" style={{ background: '#55efc4', color: '#2d3436' }}>
-                                기록 완료
+                                {t.btnComplete}
                             </button>
                         </form>
                     </div>
@@ -540,25 +709,45 @@ function App() {
             {showHelpModal && (
                 <div className="modal-overlay" onClick={() => setShowHelpModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '300px' }}>
-                        <h3>🆘 도움 주기</h3>
+                        <h3>{t.helpTitle}</h3>
                         <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>
-                            도움을 주실 수 있나요? 다른 집사님들과 소통할 수 있도록 연락처를 남겨주세요.
+                            {t.helpDesc}
                         </p>
                         <form onSubmit={handleSubmitHelp}>
                             <div className="form-group">
-                                <label>연락처</label>
+                                <label>{t.labelContact}</label>
                                 <input
                                     type="tel"
                                     required
-                                    placeholder="010-0000-0000"
+                                    placeholder={t.placeholderContact}
                                     value={helpForm.phone}
                                     onChange={(e) => setHelpForm({ ...helpForm, phone: e.target.value })}
                                 />
                             </div>
                             <button type="submit" className="submit-btn" style={{ background: '#ff7675', color: 'white' }}>
-                                도움 등록
+                                {t.btnRegisterHelp}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {showHistoryModal && selectedCat && (
+                <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '350px', maxHeight: '60vh', overflowY: 'auto' }}>
+                        <button className="modal-close-btn" onClick={() => setShowHistoryModal(false)}>✕</button>
+                        <h3>{t.historyTitle}</h3>
+                        {selectedCat.careHistory && selectedCat.careHistory.length > 0 ? (
+                            <ul className="history-list">
+                                {[...selectedCat.careHistory].reverse().map((record, idx) => (
+                                    <li key={idx} className="history-item">
+                                        ⏱ {record.date} {record.time}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>{t.historyEmpty}</p>
+                        )}
                     </div>
                 </div>
             )}
@@ -566,7 +755,7 @@ function App() {
             {showToast && (
                 <div className="toast">
                     <span className="v-mark">V</span>
-                    <span>제보가 등록되었습니다!</span>
+                    <span>{t.toastSubmitted}</span>
                 </div>
             )}
         </div>

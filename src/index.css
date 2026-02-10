@@ -1,11 +1,58 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css");
+
+@font-face {
+    font-family: 'GmarketSansBold';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansBold.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'NanumSquareNeo';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_11-01@1.0/NanumSquareNeo-Variable.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+}
+
 :root {
-    font-family: 'Noto Sans KR', sans-serif;
+    /* Set Default Font to Pretendard */
+    font-family: 'Pretendard', sans-serif;
     line-height: 1.5;
     font-weight: 400;
 
-    color-scheme: light dark;
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #242424;
+    /* Airbnb Light Theme (Verified) */
+    color-scheme: light;
+
+    --main-color: #FFD700;
+    /* Signature Yellow */
+    --main-color-hover: #FFE033;
+
+    --bg-color: #f8f9fa;
+    /* Soft White */
+    --sidebar-bg: #ffffff;
+    /* Pure White */
+    --card-bg: #f7f7f7;
+    /* Light Grey Card */
+    --input-bg: #f0f0f0;
+    /* Slightly darker for inputs */
+
+    --text-color: #222222;
+    /* Dark Grey/Black */
+    --text-muted: #717171;
+    /* Airbnb Grey */
+
+    --border-color: rgba(0, 0, 0, 0.1);
+
+    --border-radius-lg: 24px;
+    --border-radius-md: 12px;
+    --border-radius-sm: 8px;
+
+    /* Light Mode Shadows */
+    --shadow-deep: 0 6px 20px rgba(0, 0, 0, 0.15);
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    color: var(--text-color);
+    background-color: var(--bg-color);
 
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -17,84 +64,27 @@ body {
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
-}
-
-.app-container {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    text-align: center;
-}
-
-header {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 1000;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    text-align: left;
-    max-width: 300px;
-    color: #333;
-}
-
-h1 {
-    font-size: 1.8em;
-    line-height: 1.1;
-    margin: 0 0 0.5rem 0;
-}
-
-header p {
-    font-size: 0.9rem;
-    margin: 0;
+    background-color: var(--bg-color);
 }
 
 .map-wrapper {
     position: relative;
     width: 100%;
-    height: 100vh;
+    /* height set by layout now */
     overflow: hidden;
 }
 
 .leaflet-container {
     width: 100%;
-    height: 100vh;
-    /* 화면 전체 높이 */
+    height: 100%;
+    /* Fill wrapper */
+    min-height: 100vh;
 }
 
 /* Custom Marker */
 .custom-cat-icon {
     background: transparent;
     border: none;
-}
-
-/* Controls */
-.controls {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
-}
-
-.add-btn {
-    background-color: #ff9f43;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    font-size: 1.1rem;
-    border-radius: 50px;
-    cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    transition: transform 0.2s, background-color 0.2s;
-    font-family: 'Noto Sans KR', sans-serif;
-    font-weight: bold;
-}
-
-.add-btn:hover {
-    background-color: #ee8e32;
-    transform: translateY(-2px);
 }
 
 /* Modal */
@@ -104,129 +94,237 @@ header p {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 2000;
+    animation: fadeIn 0.2s ease-out;
 }
 
 .modal-content {
-    background: #2b2b2b;
-    padding: 2rem;
-    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 2.5rem;
+    border-radius: var(--border-radius-lg);
     width: 90%;
-    max-width: 500px;
+    max-width: 520px;
     text-align: left;
-    max-height: 90vh;
+    max-height: 85vh;
     overflow-y: auto;
+    position: relative;
+    box-shadow: var(--shadow-deep);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-content h2,
+.modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    font-weight: 800;
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: #3a3a3a;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+    background: #4a4a4a;
+    transform: rotate(90deg);
 }
 
 .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 0.5rem;
-    color: #ddd;
+    margin-bottom: 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 500;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
     width: 100%;
-    padding: 8px;
-    border-radius: 4px;
+    padding: 12px 16px;
+    border-radius: 12px;
     border: 1px solid #444;
     background: #333;
     color: white;
     font-family: inherit;
+    font-size: 1rem;
     box-sizing: border-box;
-    /* Fix for width overflow */
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: var(--main-color);
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
 }
 
 .submit-btn {
     width: 100%;
-    padding: 12px;
-    background: #10ac84;
-    color: white;
+    padding: 16px;
+    background: var(--main-color);
+    color: #242424;
     border: none;
-    border-radius: 6px;
-    font-size: 1rem;
+    border-radius: var(--border-radius-md);
+    font-size: 1.1rem;
     cursor: pointer;
     margin-top: 1rem;
     font-family: 'Noto Sans KR', sans-serif;
-    font-weight: bold;
+    font-weight: 800;
+    transition: filter 0.2s, transform 0.2s;
 }
 
 .submit-btn:hover {
-    background: #0d8a6a;
+    filter: brightness(1.1);
+    transform: translateY(-2px);
 }
 
 /* Popup */
-.cat-popup img {
-    width: 100%;
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
-    max-height: 150px;
-    object-fit: cover;
+.leaflet-popup-content-wrapper {
+    background: var(--card-bg);
+    color: var(--text-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-deep);
+    padding: 0;
+    overflow: hidden;
 }
 
-.cat-popup h3 {
-    margin: 0 0 5px 0;
+.leaflet-popup-tip {
+    background: var(--card-bg);
+}
+
+.leaflet-popup-content {
+    margin: 16px;
+    width: 280px !important;
+}
+
+/* Popup Elements - Force Dark Text */
+.cat-popup .cat-details-content h3 {
+    color: #242424;
+    /* Black/Dark text for name */
+}
+
+.cat-popup .cat-detail-meta {
+    color: #666;
+    /* Dark grey secondary text */
+}
+
+.cat-popup .cat-detail-desc {
+    color: #333;
+    /* Dark text for description */
+}
+
+/* Ensure 'Other Needs' and other general text in needs section is dark */
+.cat-popup .cat-needs-section {
     color: #333;
 }
 
+.cat-popup .cat-needs-section strong {
+    color: #242424;
+}
+
+.cat-popup img {
+    width: calc(100% + 32px);
+    margin: -16px -16px 16px -16px;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+}
+
+.cat-popup h3 {
+    margin: 0 0 8px 0;
+    color: #242424;
+    /* Fallback for direct h3 usage */
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
 .cat-popup p {
-    margin: 0 0 5px 0;
+    margin: 0 0 8px 0;
     color: #666;
+    font-size: 0.95rem;
 }
 
 .badge {
     display: inline-block;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    background: #e0e0e0;
-    color: #333;
-    margin-right: 5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: #3a3a3a;
+    color: #fff;
+    margin-right: 6px;
+    font-weight: 500;
+    border: 1px solid #555;
+}
+
+/* Edit/Help Buttons in Popup */
+.cat-popup button {
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+
+.cat-popup button:hover {
+    opacity: 0.9;
 }
 
 /* Toast */
 .toast {
     position: fixed;
-    bottom: 30px;
+    bottom: 40px;
     left: 50%;
     transform: translateX(-50%);
-    background: #10ac84;
+    background: #242424;
     color: white;
-    padding: 12px 24px;
+    padding: 14px 28px;
     border-radius: 50px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    gap: 12px;
+    box-shadow: var(--shadow-deep);
     z-index: 3000;
-    animation: slideUp 0.3s ease-out;
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border: 1px solid #444;
 }
 
 .v-mark {
-    background: white;
-    color: #10ac84;
-    width: 20px;
-    height: 20px;
+    background: var(--main-color);
+    color: #242424;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    font-size: 0.8rem;
+    font-weight: 900;
+    font-size: 0.9rem;
 }
 
 @keyframes slideUp {
     from {
-        transform: translate(-50%, 100%);
+        transform: translate(-50%, 150%);
         opacity: 0;
     }
 
@@ -236,32 +334,707 @@ header p {
     }
 }
 
-.cursor-crosshair,
-.cursor-crosshair .leaflet-container,
-.cursor-crosshair .leaflet-grab {
-    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' style='font-size:24px'><text y='24'>📍</text></svg>") 16 24, crosshair !important;
+@keyframes slideUpModal {
+    from {
+        transform: translateY(100px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
-@media (prefers-color-scheme: light) {
-    :root {
-        color: #213547;
-        background-color: #ffffff;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
     }
 
-    .modal-content {
-        background: white;
-        color: #333;
+    to {
+        opacity: 1;
+    }
+}
+
+.leaflet-container.cursor-crosshair {
+    cursor: crosshair !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2b2b2b;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* Light Mode Map Tiles (Reset) */
+.monochrome-tile {
+    /* No filter for light mode, just opacity */
+    opacity: 0.9;
+}
+
+/* Language Toggle */
+.lang-toggle {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+    color: #f39c12;
+    /* Darker Yellow/Orange for visibility on white */
+    padding: 10px 20px;
+    border-radius: 24px;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: 'Noto Sans KR', sans-serif;
+    box-shadow: var(--shadow-soft);
+    transition: all 0.2s;
+}
+
+.lang-toggle:hover {
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-deep);
+}
+
+/* ========================================= */
+/* MAP TILES STYLING (vWorld Gray)           */
+/* ========================================= */
+
+.vworld-gray-map {
+    /* Reset filters for Light Mode */
+    filter: none !important;
+    opacity: 0.9;
+    /* Slight opacity to reduce glare */
+}
+
+/* Improve Label Visibility */
+.leaflet-tile {
+    image-rendering: -webkit-optimize-contrast;
+}
+
+/* Make markers and buttons pop against the gray map */
+.custom-cat-icon div,
+.add-fab,
+.search-btn {
+    /* Increase saturation to make yellow stand out more */
+    filter: saturate(1.3) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+}
+
+/* 대신 지도 위 노란색 마커(🐱)와 버튼들이 더 선명하게 보이도록 강조합니다 */
+.custom-cat-icon div {
+    background: white !important;
+    border: 3px solid #FFD700 !important;
+    /* 선명한 노란색 테두리 */
+    color: #333;
+}
+
+/* Search Bar */
+.search-container {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    background: var(--card-bg);
+    padding: 6px 6px 6px 20px;
+    border-radius: 50px;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: 320px;
+    max-width: 60%;
+    transition: box-shadow 0.2s;
+}
+
+.search-container:focus-within {
+    box-shadow: var(--shadow-deep);
+    border-color: rgba(255, 215, 0, 0.5);
+}
+
+.search-input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    font-size: 1rem;
+    outline: none;
+    font-family: inherit;
+}
+
+.search-btn {
+    background: var(--main-color);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: #333;
+    margin-left: 10px;
+    transition: transform 0.2s;
+}
+
+.search-btn:hover {
+    transform: scale(1.05);
+}
+
+/* ========================================= */
+/* RESPONSIVE LAYOUT (Sidebar, FAB, Sheet)   */
+/* ========================================= */
+
+/* Layout: Sidebar + Map for Desktop */
+.app-container {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    text-align: left;
+    width: 100%;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 380px;
+    min-width: 380px;
+    background: var(--bg-color);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 500;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-header {
+    padding: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-header h1 {
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+    color: var(--main-color);
+}
+
+.sidebar-header p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.sidebar-search {
+    margin-top: 16px;
+}
+
+.sidebar-search input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--input-bg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.sidebar-search input:focus {
+    outline: none;
+    border-color: var(--main-color);
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+}
+
+.cat-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Cat Card in Sidebar */
+.cat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 16px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--main-color);
+    background-color: #fff;
+    /* Keep white/light on hover */
+}
+
+.cat-info-row {
+    display: flex;
+    margin-bottom: 6px;
+    align-items: baseline;
+    font-size: 0.9rem;
+}
+
+.cat-label {
+    min-width: 70px;
+    color: var(--text-muted);
+    margin-right: 8px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    font-weight: 500;
+}
+
+.cat-value {
+    color: var(--text-color);
+    flex: 1;
+    word-break: break-word;
+}
+
+.cat-value strong {
+    font-size: 1.1rem;
+    color: #222222;
+    /* Black for Name */
+    font-weight: 700;
+}
+
+.desc-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--text-muted);
+}
+
+.needs-row {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.needs-text {
+    color: #ced6e0;
+    /* Darker than white, softer grey */
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.care-history {
+    font-size: 0.9rem;
+    color: #a4b0be;
+    /* Darker grey */
+    margin-top: 4px;
+    margin-bottom: 12px;
+    transition: color 0.2s;
+}
+
+.care-history:hover {
+    color: #FFD700;
+    /* Yellow on hover to indicate clickable */
+}
+
+/* History Modal Styles */
+.history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.history-item {
+    padding: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #dfe6e9;
+    font-size: 0.95rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+/* Removed Conflicting Dark Theme Hover */
+
+.cat-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.cat-card-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-color);
+}
+
+.cat-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.cat-desc-preview {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin: 0 0 12px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.cat-badges-mini {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.good {
+    background-color: #4cd137;
+}
+
+.status-dot.bad {
+    background-color: #e84118;
+}
+
+/* FAB (Floating Action Button) */
+.fab-container {
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.add-fab {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: var(--main-color);
+    color: #242424;
+    border: none;
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(255, 215, 0, 0.4);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.add-fab:hover {
+    transform: scale(1.1) rotate(90deg);
+}
+
+.fab-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    animation: fadeIn 0.3s;
+}
+
+/* Map Wrapper Adjustment */
+.map-wrapper {
+    flex-grow: 1;
+    height: 100%;
+}
+
+/* Header Handling */
+@media (min-width: 768px) {
+
+    /* Hide floating header on desktop because sidebar has title */
+    header {
+        display: none;
     }
 
-    .form-group label {
-        color: #333;
+    .lang-toggle {
+        top: 20px;
+        right: 40px;
+    }
+}
+
+/* Mobile Layout */
+@media (max-width: 767px) {
+    .app-container {
+        flex-direction: column;
     }
 
-    .form-group input,
-    .form-group textarea,
-    .form-group select {
-        background: #fff;
-        border: 1px solid #ccc;
-        color: #333;
+    .sidebar {
+        display: none;
     }
+
+    /* Mobile Header matches existing style */
+    header {
+        display: block;
+        width: 100%;
+        max-width: none;
+        left: 0;
+        top: 0;
+        border-radius: 0 0 20px 20px;
+        padding: 60px 20px 20px 20px;
+        /* Space for status bar/top elements */
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.0));
+        border: none;
+        box-shadow: none;
+        backdrop-filter: none;
+    }
+
+    .map-wrapper {
+        height: 100vh;
+        width: 100%;
+    }
+
+    .fab-container {
+        bottom: 30px;
+        right: 20px;
+    }
+
+    .search-container {
+        width: calc(100% - 120px);
+        /* Leave room for lang toggle */
+        top: 20px;
+        left: 20px;
+    }
+}
+
+/* Bottom Sheet */
+.bottom-sheet-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.0);
+    /* Transparent to let map be seen? Or dim? Prompt says sheet "slides up". dimming is standard */
+    /* Wait, if overlay covers map, you can't click map... usually bottom sheet is non-modal or overlay is transparent until sheet is expanded. */
+    /* For now, treat as modal sheet for details */
+    /* Let's make it allow clicks on map if we want? But user clicked marker to see details. */
+    background: transparent;
+    z-index: 2500;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    pointer-events: none;
+    /* Let clicks pass to map? No, then you can't click overlay to close. */
+    /* Better: Overlay is just a wrapper for positioning, actual click-to-close is on the empty space? */
+    /* Let's make it a standard modal-like sheet for simplicity */
+    pointer-events: auto;
+}
+
+.bottom-sheet {
+    background: var(--card-bg);
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    padding: 12px 24px 40px 24px;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+    animation: slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    pointer-events: auto;
+}
+
+.sheet-handle {
+    width: 40px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 100px;
+    margin: 0 auto 20px auto;
+}
+
+@keyframes slideUpSheet {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* Restyle Cat Details for Sheet/Sidebar reusing classes */
+.cat-details-content {
+    color: var(--text-color);
+}
+
+.cat-detail-img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: var(--border-radius-md);
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-soft);
+}
+
+.cat-details-content h3 {
+    font-size: 1.8rem;
+    margin: 0 0 8px 0;
+}
+
+.cat-detail-meta {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+}
+
+.cat-detail-desc {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.cat-needs-section {
+    margin: 20px 0;
+    padding: 16px;
+    background: #f8f9fa;
+    /* Very Light Grey */
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.needs-urgent {
+    color: #e67e22;
+    /* Darker Orange/Gold */
+    font-weight: 700;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.needs-care {
+    color: #f39c12;
+    /* Dark Yellow/Orange */
+    font-weight: 700;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.care-req-title {
+    color: #f39c12;
+    /* Darker Yellow/Orange */
+    font-weight: 700;
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+}
+
+.action-btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: transform 0.1s, opacity 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active {
+    transform: scale(0.98);
+}
+
+.help-btn {
+    background: #ffffff;
+    color: #f39c12;
+    border: 1px solid #f39c12;
+}
+
+.care-btn {
+    background: var(--main-color);
+    color: #2d3436;
+    border: 1px solid transparent;
+}
+
+.care-btn:hover {
+    background: #FFC107;
+    /* Slightly darker yellow */
+}
+
+.edit-btn {
+    background: #ffffff;
+    color: var(--text-muted);
+    margin-top: 10px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.edit-btn:hover {
+    background: #f1f2f6;
+    color: var(--text-color);
+    border-color: #b2bec3;
+}
+
+.needs-text {
+    color: var(--text-color);
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.care-history {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    margin-bottom: 12px;
+    transition: color 0.2s;
+}
+
+.care-history:hover {
+    color: #e67e22;
+    /* Orange on hover */
+    text-decoration: underline;
+}
+
+/* Improve Label Visibility (Phase 14) */
+.leaflet-tile {
+    image-rendering: -webkit-optimize-contrast;
+}
+
+/* Custom Font Applications (Phase 16) */
+h1,
+.app-title,
+.submit-btn {
+    font-family: 'GmarketSansBold', sans-serif;
+    letter-spacing: -0.02em;
+}
+
+.cat-detail-meta,
+.cat-date {
+    font-family: 'NanumSquareNeo', sans-serif;
 }

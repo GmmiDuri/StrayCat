@@ -1,0 +1,162 @@
+export const translations = {
+    ko: {
+        appTitle: "🐈 길냥이 지도",
+        headerDescAdding: "📍 지도의 원하는 위치를 클릭하여 등록을 시작하세요",
+        headerDescDefault: "새로운 길냥이를 등록하고 싶다면 아래에 '새로운 길냥이 등록' 버튼을 누른 후 지도를 클릭해주세요",
+        addBtn: "🐾 새로운 길냥이 등록",
+        editTitle: "📝 길냥이 정보 수정",
+        addTitle: "🏠 길냥이 제보하기",
+        labelName: "이름",
+        labelDesc: "특징",
+        placeholderDesc: "ex) 고등어, 오른쪽 눈 다침",
+        labelNeeds: "필요사항",
+        labelCustomNeeds: "필요한 사항을 직접 입력해주세요",
+        labelFoundDate: "발견 날짜",
+        labelFirstFound: "첫 발견",
+        labelFoundTime: "발견 시간",
+        labelCondition: "영양 상태",
+        labelStatusSidebar: "상태",
+        labelNeutered: "중성화",
+        labelPhoto: "사진 URL (선택)",
+        labelPhone: "작성자 연락처 (선택)",
+        placeholderPhone: "(동물병원에 다른 집사와 함께 즉시 방문이 필요한 경우 등 입력)",
+        submitUpdate: "수정 완료",
+        submitAdd: "제보 완료",
+        submitAdd: "제보 완료",
+        toastSubmitted: "제보가 등록되었습니다!",
+        catSearchPlaceholder: "이름으로 고양이 검색...",
+
+        // Options
+        optNone: "없음(선택 안 함)",
+        optNeuter: "중성화 필요",
+        optTreat: "즉시 치료 필요",
+        optCare: "주기적 길냥이 집사 필요",
+        optCustom: "직접 입력",
+        optGood: "좋음",
+        optAvg: "보통",
+        optThin: "마름",
+        optVerified: "확인됨(TNR 완료)",
+        optNotDone: "미완료",
+        optUnknown: "모름",
+
+        // Popup & Others
+        foundAt: "🕒 (첫 발견 시기)",
+        status: "Status",
+        tnr: "TNR",
+        helpReq: "🆘 집사 도움 요청",
+        helpers: "명 참여 중",
+        helpersList: "📞 도움 주시는 분들:",
+        btnHelp: "🙌 도움 주기",
+        careReq: "🏠 집사 모집 중",
+        careCount: "회 돌봄",
+        lastMeal: "🥣 최근 식사:",
+        btnRecordCare: "🍚 밥/물 줬어요 (기록)",
+        otherNeeds: "기타 필요사항:",
+        btnEdit: "✏️ 정보 수정",
+
+        // Care/Help Modals
+        careTitle: "🍚 돌봄 기록 남기기",
+        careDesc: "오늘 길냥이에게 맛있는 밥과 물을 주셨나요? 시간을 기록해주세요!",
+        labelDate: "날짜",
+        labelTime: "시간",
+        btnComplete: "기록 완료",
+        helpTitle: "🆘 도움 주기",
+        helpDesc: "도움을 주실 수 있나요? 다른 집사님들과 소통할 수 있도록 연락처를 남겨주세요.",
+        labelContact: "연락처",
+        placeholderContact: "010-0000-0000",
+        btnRegisterHelp: "도움 등록",
+
+        // Alerts
+        alertThanks: "도움을 주셔서 감사합니다! 🐾 연락처가 등록되었습니다.",
+        alertCare: "돌봄 기록이 등록되었습니다! 🍚💧",
+        alertError: "오류가 발생했습니다.",
+        alertSaveError: "저장에 실패했습니다. 콘솔을 확인해주세요.",
+
+        // History Modal
+        historyTitle: "📋 돌봄 기록 히스토리",
+        historyEmpty: "아직 기록이 없습니다.",
+
+        // Notices
+        noticeNeuter: "📢 중성화 전 해당 구청 담당부서에 지원 문의를 해보세요!"
+    },
+    en: {
+        appTitle: "🐈 Stray Cat Map",
+        headerDescAdding: "📍 Click a location on the map to register",
+        headerDescDefault: "Click 'Register New Cat' below, then click on the map to add a cat",
+        addBtn: "🐾 Register New Cat",
+        editTitle: "📝 Edit Cat Info",
+        addTitle: "🏠 Report a Cat",
+        labelName: "Name",
+        labelDesc: "Description",
+        placeholderDesc: "ex) Mackerel tabby, right eye injured",
+        labelNeeds: "Needs",
+        labelCustomNeeds: "Enter specific needs",
+        labelFoundDate: "Found Date",
+        labelFirstFound: "First Found",
+        labelFoundTime: "Found Time",
+        labelCondition: "Condition",
+        labelStatusSidebar: "Status",
+        labelNeutered: "Neutered",
+        labelPhoto: "Photo URL (Optional)",
+        labelPhone: "Contact (Optional)",
+        placeholderPhone: "(Enter if immediate joint vet visit is needed)",
+        submitUpdate: "Update",
+        submitAdd: "Submit",
+        submitAdd: "Submit",
+        toastSubmitted: "Report submitted!",
+        catSearchPlaceholder: "Search cat by name...",
+
+        // Options
+        optNone: "None",
+        optNeuter: "Needs Neuter",
+        optTreat: "Needs Treatment",
+        optCare: "Needs Regular Caretaker",
+        optCustom: "Custom Input",
+        optGood: "Good",
+        optAvg: "Average",
+        optThin: "Thin",
+        optVerified: "Verified (TNR Done)",
+        optNotDone: "Not Done",
+        optUnknown: "Unknown",
+
+        // Popup & Others
+        foundAt: "🕒 Found:",
+        status: "Status",
+        tnr: "TNR",
+        helpReq: "🆘 Help Needed",
+        helpers: "helping",
+        helpersList: "📞 Helpers:",
+        btnHelp: "🙌 Offer Help",
+        careReq: "🏠 Caretakers Wanted",
+        careCount: "cares",
+        lastMeal: "🥣 Last Meal:",
+        btnRecordCare: "🍚 Fed/Watered (Record)",
+        otherNeeds: "Other Needs:",
+        btnEdit: "✏️ Edit Info",
+
+        // Care/Help Modals
+        careTitle: "🍚 Record Care",
+        careDesc: "Did you feed or water the cat today? Please record the time!",
+        labelDate: "Date",
+        labelTime: "Time",
+        btnComplete: "Complete",
+        helpTitle: "🆘 Offer Help",
+        helpDesc: "Can you help? Leave your contact to coordinate with others.",
+        labelContact: "Contact",
+        placeholderContact: "Phone Number",
+        btnRegisterHelp: "Register Help",
+
+        // Alerts
+        alertThanks: "Thank you for helping! 🐾 Contact registered.",
+        alertCare: "Care record added! 🍚💧",
+        alertError: "An error occurred.",
+        alertSaveError: "Failed to save. Check console.",
+
+        // History Modal
+        historyTitle: "📋 Care History",
+        historyEmpty: "No records yet.",
+
+        // Notices
+        noticeNeuter: "📢 Contact your local district office for neutering support!"
+    }
+};
