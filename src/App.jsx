@@ -1,3 +1,7 @@
+import * as tf from '@tensorflow/tfjs';
+import * as mobilenet from '@tensorflow-models/mobilenet';
+import proj4 from 'proj4';
+import hospitalData from './data/hospitals.json';
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -7,6 +11,13 @@ import { onAuthStateChanged } from "firebase/auth";
 import { translations } from './translations';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
+
+// Proj4 definitions for Korean Coordinate systems
+// Most public data in GRS80 Central uses False E/N: 200000, 500000 (or 600000)
+// il-gok hospital in Gwangju (~126.9E, 35.2N) matches 200k/500k origin.
+proj4.defs("EPSG:5181", "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +units=m +no_defs");
+const wgs84 = "EPSG:4326";
+const utmk = "EPSG:5181";
 
 // Custom Marker Icon
 const catIcon = new L.DivIcon({
@@ -102,7 +113,45 @@ function AuthModal({ isOpen, onClose, onGoogleLogin, onEmailAuth }) {
     );
 }
 
-// Component to handle map FlyTo actions
+// Duplicate Warning Modal
+function DuplicateModal({ isOpen, duplicateCat, onConfirm, onCancel }) {
+    if (!isOpen || !duplicateCat) return null;
+
+    return (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+            <div className="modal-content duplicate-modal" style={{ maxWidth: '350px', textAlign: 'center' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🔍🐱</div>
+                <h3>이미 등록된 고양이인가요?</h3>
+                <p style={{ color: '#666', marginBottom: '20px' }}>
+                    1km 이내에 비슷한 사진의 고양이(<strong>{duplicateCat.name}</strong>)가 이미 등록되어 있습니다.
+                </p>
+                {duplicateCat.photo && (
+                    <img
+                        src={duplicateCat.photo}
+                        alt="Duplicate candidate"
+                        style={{ width: '100%', borderRadius: '12px', marginBottom: '20px', maxHeight: '200px', objectFit: 'cover' }}
+                    />
+                )}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                        className="submit-btn"
+                        style={{ background: '#eee', color: '#666' }}
+                        onClick={onCancel}
+                    >
+                        이미 있는 고양이에요
+                    </button>
+                    <button
+                        className="submit-btn"
+                        onClick={onConfirm}
+                    >
+                        아뇨, 다른 고양이에요
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // Component to handle map FlyTo actions
 function MapController({ selectedCat, markersRef, searchResult }) {
     const map = useMap();
@@ -157,6 +206,20 @@ function App() {
     const [tempCoords, setTempCoords] = useState(null);
     const [editingId, setEditingId] = useState(null); // Track which cat is being edited
     const [lang, setLang] = useState('ko'); // Language state: 'ko' or 'en'
+    const [sidebarWidth, setSidebarWidth] = useState(350);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const isResizing = useRef(false);
+
+    // TF.js Model State
+    const [model, setModel] = useState(null);
+    const [isModelLoading, setIsModelLoading] = useState(true);
+
+    // Duplicate Check State
+    const [duplicateCat, setDuplicateCat] = useState(null);
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+
+    // Nearby Hospitals State
+    const [nearbyHospitals, setNearbyHospitals] = useState([]);
 
     // Auth State
     const [user, setUser] = useState(null);
@@ -168,6 +231,22 @@ function App() {
             setUser(currentUser);
         });
         return () => unsubscribe();
+    }, []);
+
+    // TF.js Model Loading
+    useEffect(() => {
+        const loadModel = async () => {
+            try {
+                const loadedModel = await mobilenet.load();
+                setModel(loadedModel);
+                setIsModelLoading(false);
+                console.log("MobileNet model loaded.");
+            } catch (error) {
+                console.error("Failed to load MobileNet model:", error);
+                setIsModelLoading(false);
+            }
+        };
+        loadModel();
     }, []);
 
     const handleGoogleLogin = async () => {
@@ -217,6 +296,131 @@ function App() {
             console.error("Logout failed:", error);
         }
     };
+
+    const startResizing = (e) => {
+        isResizing.current = true;
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', stopResizing);
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isResizing.current) return;
+        const newWidth = e.clientX;
+        const maxWidth = window.innerWidth / 2;
+        if (newWidth >= 280 && newWidth <= maxWidth) {
+            setSidebarWidth(newWidth);
+        }
+    };
+
+    const stopResizing = () => {
+        isResizing.current = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', stopResizing);
+        document.body.style.userSelect = 'auto';
+        document.body.style.cursor = 'default';
+    };
+
+    // --- Image Similarity Logic ---
+    const getEmbeddings = async (imgUrl) => {
+        if (!model) return null;
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = imgUrl;
+            img.onload = async () => {
+                try {
+                    const embedding = await model.infer(img, true); // Extract 1024-d embedding
+                    const vector = await embedding.data();
+                    resolve(Array.from(vector));
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            img.onerror = (err) => reject(err);
+        });
+    };
+
+    const cosineSimilarity = (vecA, vecB) => {
+        let dotProduct = 0;
+        let normA = 0;
+        let normB = 0;
+        for (let i = 0; i < vecA.length; i++) {
+            dotProduct += vecA[i] * vecB[i];
+            normA += vecA[i] * vecA[i];
+            normB += vecB[i] * vecB[i];
+        }
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    };
+
+    const checkDuplicates = async (newImgUrl, lat, lng) => {
+        if (!model || !newImgUrl) return null;
+
+        try {
+            const newEmbedding = await getEmbeddings(newImgUrl);
+
+            // Fetch nearby cats (simple 1km bounding box)
+            // 1 degree lat is ~111km, 0.01 degree is ~1.1km
+            const latRange = 0.01;
+            const lngRange = 0.012; // Adjust for Korea's longitude
+
+            const nearbyCats = cats.filter(c =>
+                Math.abs(c.lat - lat) < latRange &&
+                Math.abs(c.lng - lng) < lngRange
+            );
+
+            for (const cat of nearbyCats) {
+                if (cat.embedding && cat.embedding.length > 0) {
+                    const similarity = cosineSimilarity(newEmbedding, cat.embedding);
+                    if (similarity > 0.8) {
+                        return { ...cat, similarity };
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Duplicate check error:", error);
+        }
+        return null;
+    };
+
+    // --- Hospital Display Logic ---
+    const fetchNearbyHospitals = (catLat, catLng) => {
+        // Simple bounding box filtering (~1km)
+        // Note: Hospital data is in UTM-K (X, Y) but hospital.lat/lng keys are used for X/Y
+
+        const hospitals = hospitalData.map(h => {
+            if (h.lat && h.lng) {
+                // Convert UTM-K [lng_x, lat_y] to WGS84 [lng, lat]
+                // Warning: hospitals.json.json had 'lat' as UTM-K X and 'lng' as UTM-K Y
+                try {
+                    const [convertedLng, convertedLat] = proj4(utmk, wgs84, [h.lat, h.lng]);
+                    return { ...h, wgsLat: convertedLat, wgsLng: convertedLng };
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }).filter(h => h !== null);
+
+        // Calculate distance and filter (1km approx)
+        const latRange = 0.01;
+        const lngRange = 0.012;
+
+        const filtered = hospitals.filter(h =>
+            Math.abs(h.wgsLat - catLat) < latRange &&
+            Math.abs(h.wgsLng - catLng) < lngRange
+        );
+
+        setNearbyHospitals(filtered);
+    };
+
+    const hospitalIcon = new L.DivIcon({
+        className: 'custom-hospital-icon',
+        html: `<div style="background: white; border: 2px solid #3498db; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">💙</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+    });
 
     // Urgent Fix: Missing States
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -434,8 +638,8 @@ function App() {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (e, forceSubmit = false) => {
+        if (e) e.preventDefault();
 
         try {
             if (editingId) {
@@ -448,6 +652,19 @@ function App() {
                     alert("이메일 인증을 완료해야 등록이 가능합니다.");
                     return;
                 }
+
+                // 중복 체크 로직 (forceSubmit이 아닐 때만)
+                if (!forceSubmit && formData.photo) {
+                    const potentialDuplicate = await checkDuplicates(formData.photo, tempCoords.lat, tempCoords.lng);
+                    if (potentialDuplicate) {
+                        setDuplicateCat(potentialDuplicate);
+                        setShowDuplicateModal(true);
+                        return;
+                    }
+                }
+
+                const embedding = formData.photo ? await getEmbeddings(formData.photo) : [];
+
                 await addDoc(collection(db, "cats"), {
                     ...formData,
                     id: Date.now(),
@@ -455,16 +672,19 @@ function App() {
                     lng: tempCoords.lng,
                     createdAt: new Date(),
                     userId: user.uid,
-                    userEmail: user.email
+                    userEmail: user.email,
+                    embedding: embedding
                 });
             }
             setShowModal(false);
+            setShowDuplicateModal(false);
+            setDuplicateCat(null);
             setShowToast(true);
             setFormData({
                 name: '',
                 desc: '',
                 condition: '좋음',
-                neutered: '확인됨(TNR 완료)',
+                neutered: '미완료',
                 photo: '',
                 foundDate: new Date().toISOString().split('T')[0],
                 foundTime: '12:00',
@@ -477,8 +697,8 @@ function App() {
             setEditingId(null);
             setTimeout(() => setShowToast(false), 3000);
         } catch (error) {
-            console.error("Error saving document: ", error);
-            alert(t.alertSaveError);
+            console.error("Error adding/updating cat:", error);
+            alert(t.alertError);
         }
     };
 
@@ -568,12 +788,22 @@ function App() {
                 )}
 
                 {user && (
-                    <button
-                        onClick={() => handleEdit(cat)}
-                        className="edit-btn"
-                    >
-                        {t.btnEdit}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                        <button
+                            onClick={() => fetchNearbyHospitals(cat.lat, cat.lng)}
+                            className="action-btn hospital-btn"
+                            style={{ flex: 1, margin: 0, background: '#e1f5fe', color: '#0288d1', border: '1px solid #b3e5fc' }}
+                        >
+                            💙 주변 병원 보기
+                        </button>
+                        <button
+                            onClick={() => handleEdit(cat)}
+                            className="edit-btn"
+                            style={{ flex: 1, margin: 0 }}
+                        >
+                            {t.btnEdit}
+                        </button>
+                    </div>
                 )}
 
                 {!user && (
@@ -591,8 +821,26 @@ function App() {
                 {lang === 'ko' ? 'English' : '한국어'}
             </button>
 
-            {/* Sidebar (Desktop Only via CSS) */}
-            <aside className="sidebar">
+            {/* Resizer Toggle Button */}
+            <button
+                className={`sidebar-toggle-btn ${isSidebarCollapsed ? 'collapsed' : ''}`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSidebarCollapsed(!isSidebarCollapsed);
+                }}
+                style={{
+                    left: isSidebarCollapsed ? '0' : `${sidebarWidth}px`
+                }}
+                title={isSidebarCollapsed ? "사이드바 열기" : "사이드바 닫기"}
+            >
+                {isSidebarCollapsed ? '▶' : '◀'}
+            </button>
+
+            {/* Sidebar */}
+            <aside
+                className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
+                style={{ width: isSidebarCollapsed ? 0 : sidebarWidth }}
+            >
                 <div className="sidebar-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <h1 style={{ margin: 0 }}>{t.appTitle}</h1>
@@ -613,7 +861,7 @@ function App() {
                             </div>
                         )}
                     </div>
-                    <p>{t.headerDescDefault}</p>
+                    {user && <p>{t.headerDescDefault}</p>}
                     {user && (
                         <>
                             <div style={{ marginTop: '10px' }}>
@@ -688,7 +936,12 @@ function App() {
                 </div>
             </aside>
 
-            <div className="map-wrapper">
+            {/* Resizer Handle */}
+            {!isSidebarCollapsed && (
+                <div className="sidebar-resizer" onMouseDown={startResizing}></div>
+            )}
+
+            <div className="map-section">
                 <MapContainer
                     center={[37.5708, 126.9801]}
                     zoom={17}
@@ -712,6 +965,21 @@ function App() {
                         className="map-label-layer"
                         zIndex={100}
                     />
+                    {nearbyHospitals.map((hospital, idx) => (
+                        <Marker
+                            key={`hospital-${idx}`}
+                            position={[hospital.wgsLat, hospital.wgsLng]}
+                            icon={hospitalIcon}
+                        >
+                            <Popup>
+                                <div className="hospital-popup">
+                                    <strong>{hospital.name}</strong><br />
+                                    📞 {hospital.phone || '전화번호 없음'}
+                                </div>
+                            </Popup>
+                        </Marker>
+                    ))}
+
                     <MapEvents onMapClick={handleMapClick} isAdding={isAdding} setIsAdding={setIsAdding} />
                     <MapController selectedCat={selectedCat} markersRef={markersRef} searchResult={searchResult} />
 
@@ -985,6 +1253,17 @@ function App() {
                 onClose={() => setShowAuthModal(false)}
                 onGoogleLogin={handleGoogleLogin}
                 onEmailAuth={handleEmailAuth}
+            />
+
+            <DuplicateModal
+                isOpen={showDuplicateModal}
+                duplicateCat={duplicateCat}
+                onConfirm={() => handleSubmit(null, true)}
+                onCancel={() => {
+                    setShowDuplicateModal(false);
+                    setDuplicateCat(null);
+                    setShowModal(false);
+                }}
             />
         </div>
     );

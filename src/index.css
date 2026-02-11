@@ -1,4 +1,4 @@
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css");
+﻿@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css");
 
 @font-face {
     font-family: 'GmarketSansBold';
@@ -434,11 +434,11 @@ body {
     filter: saturate(1.3) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
 }
 
-/* 대신 지도 위 노란색 마커(🐱)와 버튼들이 더 선명하게 보이도록 강조합니다 */
+/* ???吏?????몃???留덉빱(?맩)? 踰꾪듉?ㅼ씠 ???좊챸?섍쾶 蹂댁씠?꾨줉 媛뺤“?⑸땲??*/
 .custom-cat-icon div {
     background: white !important;
     border: 3px solid #FFD700 !important;
-    /* 선명한 노란색 테두리 */
+    /* ?좊챸???몃????뚮몢由?*/
     color: #333;
 }
 
@@ -1038,7 +1038,7 @@ h1,
 .cat-date {
     font-family: 'NanumSquareNeo', sans-serif;
 }
-/* ��α��� ������ ���� ���� ȿ�� */
+/* Login Blur Effect */
 .blur-content {
     filter: blur(5px);
     user-select: none;
@@ -1046,7 +1046,7 @@ h1,
     opacity: 0.6;
 }
 
-/* ���̵�� �α��� ��ư */
+/* 사이드바 로그인 버튼 */
 .login-btn {
     background: white;
     color: #242424;
@@ -1262,3 +1262,82 @@ h1,
     border: 2px solid var(--main-color);
 }
 
+
+/* Sidebar Resize & Fold Styles */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    position: relative;
+}
+
+.sidebar {
+    height: 100%;
+    flex-shrink: 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    background: white;
+    border-right: 1px solid #eee;
+    overflow-x: hidden;
+    position: relative;
+    white-space: nowrap; /* Prevent text wrapping during collapse */
+}
+
+.sidebar.collapsed {
+    border-right: none;
+    width: 0 !important;
+}
+
+.sidebar-resizer {
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 1001;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    margin-left: -3px;
+}
+
+.sidebar-resizer:hover {
+    background: var(--main-color);
+}
+
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2005;
+    width: 20px;
+    height: 60px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    border-left: none;
+}
+
+.sidebar-toggle-btn:hover {
+    background: #f8f9fa;
+    color: var(--main-color);
+}
+
+.map-section {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    min-width: 0;
+}
+
+@media (max-width: 768px) {
+    .sidebar-resizer, .sidebar-toggle-btn {
+        display: none;
+    }
+}
