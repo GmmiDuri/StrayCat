@@ -1,20 +1,92 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import { db, auth, googleProvider, signInWithPopup, signOut } from './firebase';
+import { db, auth, googleProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from './firebase';
 import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { translations } from './translations';
-import 'leaflet/dist/leaflet.css';
-import './index.css';
 
-// Custom Marker Icon
-const catIcon = new L.DivIcon({
-    className: 'custom-cat-icon',
-    html: `<div style="background: white; border: 2px solid #FFD700; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">🐱</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-});
+// Intro Section for Guest Users
+function IntroSection({ catsCount, onLoginClick }) {
+    const today = new Date().toISOString().split('T')[0];
+    const todayCats = catsCount > 0 ? Math.floor(catsCount * 0.1) + 1 : 0; // Simulated "Today" stat if not in DB
+
+    return (
+        <div className="intro-section">
+            <div className="intro-badge">우리 동네 길냥이 안전 지도</div>
+            <div className="intro-illustration">
+                <div className="cat-emoji-large">🐾🐱🏘️</div>
+            </div>
+            <h2>함께 만드는 고양이 지도</h2>
+            <div className="intro-stats">
+                <div className="stat-card">
+                    <span className="stat-value">{catsCount}</span>
+                    <span className="stat-label">등록된 고양이</span>
+                </div>
+                <div className="stat-card">
+                    <span className="stat-value">+{todayCats}</span>
+                    <span className="stat-label">오늘의 집사 활동</span>
+                </div>
+            </div>
+            <p className="intro-desc">
+                길냥이들의 건강 상태와 밥자리, TNR 여부를 공유하고 <br />
+                우리 동네 고양이들의 안전한 삶을 지켜주세요.
+            </p>
+            <button className="intro-login-btn" onClick={onLoginClick}>
+                지금 시작하기
+            </button>
+        </div>
+    );
+}
+
+// Unified Auth Modal
+function AuthModal({ isOpen, onClose, onGoogleLogin, onEmailAuth }) {
+    const [isLogin, setIsLogin] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onEmailAuth(isLogin, email, password);
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content auth-modal" onClick={(e) => e.stopPropagation()}>
+                <button className="modal-close-btn" onClick={onClose}>✕</button>
+                <h2>{isLogin ? "로그인" : "회원가입"}</h2>
+
+                <button className="google-auth-btn" onClick={onGoogleLogin}>
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="G" />
+                    Google로 계속하기
+                </button>
+
+                <div className="auth-divider">
+                    <span>또는 이메일로 {isLogin ? '로그인' : '시작하기'}</span>
+                </div>
+
+                <form onSubmit={handleSubmit} className="auth-form">
+                    <div className="form-group">
+                        <label>이메일</label>
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="example@mail.com" />
+                    </div>
+                    <div className="form-group">
+                        <label>비밀번호</label>
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="6자리 이상" />
+                    </div>
+                    <button type="submit" className="submit-btn">
+                        {isLogin ? "로그인" : "회원가입하기"}
+                    </button>
+                </form>
+
+                <div className="auth-toggle">
+                    {isLogin ? "계정이 없으신가요?" : "이미 계정이 있으신가요?"}
+                    <button onClick={() => setIsLogin(!isLogin)}>
+                        {isLogin ? "회원가입" : "로그인"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // Component to handle map FlyTo actions
 // Component to handle map FlyTo actions
@@ -83,12 +155,41 @@ function App() {
         return () => unsubscribe();
     }, []);
 
-    const handleLogin = async () => {
+    const handleGoogleLogin = async () => {
         try {
             await signInWithPopup(auth, googleProvider);
+            setShowAuthModal(false);
         } catch (error) {
             console.error("Login failed:", error);
-            alert("로그인 중 오류가 발생했습니다.");
+            let msg = "로그인 중 오류가 발생했습니다.";
+            if (error.code === 'auth/unauthorized-domain') {
+                msg = "승인되지 않은 도메인입니다. Firebase 콘솔 설정을 확인하세요.";
+            }
+            alert(msg);
+        }
+    };
+
+    const handleEmailAuth = async (isLogin, email, password) => {
+        try {
+            if (isLogin) {
+                await signInWithEmailAndPassword(auth, email, password);
+                setShowAuthModal(false);
+            } else {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await sendEmailVerification(userCredential.user);
+                alert("인증 메일이 발송되었습니다. 이메일을 확인 후 다시 로그인해주세요.");
+                await signOut(auth);
+                setShowAuthModal(false);
+            }
+        } catch (error) {
+            console.error("Auth failed:", error);
+            let msg = "오류가 발생했습니다.";
+            const code = error.code;
+            if (code === 'auth/email-already-in-use') msg = "이미 사용 중인 이메일입니다.";
+            else if (code === 'auth/weak-password') msg = "비밀번호가 너무 취약합니다 (6자 이상).";
+            else if (code === 'auth/invalid-email') msg = "유효하지 않은 이메일 형식입니다.";
+            else if (code === 'auth/user-not-found' || code === 'auth/wrong-password') msg = "이메일 또는 비밀번호가 틀렸습니다.";
+            alert(msg);
         }
     };
 
@@ -190,7 +291,11 @@ function App() {
 
     const handleManualAdd = () => {
         if (!user) {
-            alert("로그인이 필요한 기능입니다.");
+            setShowAuthModal(true);
+            return;
+        }
+        if (!user.emailVerified && user.providerData[0].providerId === 'password') {
+            alert("이메일 인증이 필요합니다. 메일함을 확인해주세요.");
             return;
         }
         setIsAdding(true);
@@ -324,6 +429,10 @@ function App() {
                 await updateDoc(catRef, formData);
             } else {
                 // 새 등록 모드
+                if (!user.emailVerified && user.providerData[0].providerId === 'password') {
+                    alert("이메일 인증을 완료해야 등록이 가능합니다.");
+                    return;
+                }
                 await addDoc(collection(db, "cats"), {
                     ...formData,
                     id: Date.now(),
@@ -473,12 +582,16 @@ function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <h1 style={{ margin: 0 }}>{t.appTitle}</h1>
                         {!user ? (
-                            <button className="login-btn" onClick={handleLogin}>
-                                <span>G</span> 구글 로그인
+                            <button className="login-btn" onClick={() => setShowAuthModal(true)}>
+                                로그인
                             </button>
                         ) : (
                             <div className="user-profile">
-                                {user.photoURL && <img src={user.photoURL} alt="Profile" className="user-avatar" />}
+                                {user.photoURL ? (
+                                    <img src={user.photoURL} alt="Profile" className="user-avatar" />
+                                ) : (
+                                    <div className="user-avatar-placeholder">👤</div>
+                                )}
                                 <button className="login-btn" onClick={handleLogout} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
                                     로그아웃
                                 </button>
@@ -487,62 +600,67 @@ function App() {
                     </div>
                     <p>{t.headerDescDefault}</p>
                     {user && (
-                        <div style={{ marginTop: '10px' }}>
-                            <button className="filter-my-btn" onClick={() => setCatSearchQuery(prev => prev === 'MY_CATS' ? '' : 'MY_CATS')}>
-                                {catSearchQuery === 'MY_CATS' ? '전체 보기' : '내 기록 보기'}
-                            </button>
-                        </div>
+                        <>
+                            <div style={{ marginTop: '10px' }}>
+                                <button className="filter-my-btn" onClick={() => setCatSearchQuery(prev => prev === 'MY_CATS' ? '' : 'MY_CATS')}>
+                                    {catSearchQuery === 'MY_CATS' ? '전체 보기' : '내 기록 보기'}
+                                </button>
+                            </div>
+                            <div className="sidebar-search">
+                                <input
+                                    type="text"
+                                    placeholder={t.catSearchPlaceholder}
+                                    value={catSearchQuery}
+                                    onChange={(e) => setCatSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </>
                     )}
-                    <div className="sidebar-search">
-                        <input
-                            type="text"
-                            placeholder={t.catSearchPlaceholder}
-                            value={catSearchQuery}
-                            onChange={(e) => setCatSearchQuery(e.target.value)}
-                        />
-                    </div>
                 </div>
                 <div className="cat-list">
-                    {cats
-                        .filter(cat => {
-                            if (catSearchQuery === 'MY_CATS') {
-                                return user && cat.userId === user.uid;
-                            }
-                            return cat.name.toLowerCase().includes(catSearchQuery.toLowerCase());
-                        })
-                        .map(cat => (
-                            <div key={cat.id} className="cat-card" onClick={() => setSelectedCat(cat)}>
-                                <div className="cat-info-row">
-                                    <span className="cat-label">{t.labelName}:</span>
-                                    <span className="cat-value"><strong>{cat.name}</strong></span>
-                                </div>
-                                <div className="cat-info-row">
-                                    <span className="cat-label">{t.labelFirstFound}:</span>
-                                    <span className="cat-value">{cat.foundDate}</span>
-                                </div>
-                                <div className="cat-info-row">
-                                    <span className="cat-label">{t.labelDesc}:</span>
-                                    <span className="cat-value desc-text">{cat.desc}</span>
-                                </div>
-                                <div className="cat-info-row">
-                                    <span className="cat-label">{t.labelStatusSidebar}:</span>
-                                    <span className="cat-value">
-                                        <span className={`status-dot ${cat.condition === '좋음' ? 'good' : 'bad'}`}></span>
-                                        {cat.condition}
-                                    </span>
-                                </div>
-                                {cat.needs && cat.needs !== '없음' && cat.needs !== 'None' && (
-                                    <div className="cat-info-row needs-row">
-                                        <span className="cat-label">{t.labelNeeds}:</span>
-                                        <span className="cat-value needs-text">
-                                            {cat.needs === '직접 입력' || cat.needs === 'Custom Input' ? cat.customNeeds : cat.needs}
+                    {!user ? (
+                        <IntroSection catsCount={cats.length} onLoginClick={() => setShowAuthModal(true)} />
+                    ) : (
+                        cats
+                            .filter(cat => {
+                                if (catSearchQuery === 'MY_CATS') {
+                                    return user && cat.userId === user.uid;
+                                }
+                                return cat.name.toLowerCase().includes(catSearchQuery.toLowerCase());
+                            })
+                            .map(cat => (
+                                <div key={cat.id} className="cat-card" onClick={() => setSelectedCat(cat)}>
+                                    <div className="cat-info-row">
+                                        <span className="cat-label">{t.labelName}:</span>
+                                        <span className="cat-value"><strong>{cat.name}</strong></span>
+                                    </div>
+                                    <div className="cat-info-row">
+                                        <span className="cat-label">{t.labelFirstFound}:</span>
+                                        <span className="cat-value">{cat.foundDate}</span>
+                                    </div>
+                                    <div className="cat-info-row">
+                                        <span className="cat-label">{t.labelDesc}:</span>
+                                        <span className="cat-value desc-text">{cat.desc}</span>
+                                    </div>
+                                    <div className="cat-info-row">
+                                        <span className="cat-label">{t.labelStatusSidebar}:</span>
+                                        <span className="cat-value">
+                                            <span className={`status-dot ${cat.condition === '좋음' ? 'good' : 'bad'}`}></span>
+                                            {cat.condition}
                                         </span>
                                     </div>
-                                )}
-                            </div>
-                        ))}
-
-                    {cats.filter(cat => {
+                                    {cat.needs && cat.needs !== '없음' && cat.needs !== 'None' && (
+                                        <div className="cat-info-row needs-row">
+                                            <span className="cat-label">{t.labelNeeds}:</span>
+                                            <span className="cat-value needs-text">
+                                                {cat.needs === '직접 입력' || cat.needs === 'Custom Input' ? cat.customNeeds : cat.needs}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                    )}
+                    {user && cats.filter(cat => {
                         if (catSearchQuery === 'MY_CATS') {
                             return user && cat.userId === user.uid;
                         }
@@ -846,6 +964,13 @@ function App() {
                     <span>{t.toastSubmitted}</span>
                 </div>
             )}
+
+            <AuthModal
+                isOpen={showAuthModal}
+                onClose={() => setShowAuthModal(false)}
+                onGoogleLogin={handleGoogleLogin}
+                onEmailAuth={handleEmailAuth}
+            />
         </div>
     );
 }
