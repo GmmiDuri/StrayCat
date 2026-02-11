@@ -13,9 +13,9 @@ import 'leaflet/dist/leaflet.css';
 import './index.css';
 
 // Proj4 definitions for Korean Coordinate systems
-// Most public data in GRS80 Central uses False E/N: 200000, 500000 (or 600000)
-// il-gok hospital in Gwangju (~126.9E, 35.2N) matches 200k/500k origin.
-proj4.defs("EPSG:5181", "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs");
+// Reverting to 500,000 and applying Bessel 1841 correction (EPSG:5174 styled)
+// towgs84 values are typically: -115.80, 474.99, 674.11, 1.16, -2.31, -1.63, 6.43 (for Korea)
+proj4.defs("EPSG:5181", "+proj=tmerc +lat_0=38 +lon_0=127.0028902777778 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43");
 const wgs84 = "EPSG:4326";
 const utmk = "EPSG:5181";
 
@@ -91,10 +91,10 @@ function VerificationGuard({ user, onLogout }) {
                     <button className="submit-btn" onClick={handleReload}>
                         새로고침 / 확인
                     </button>
-                    <button className="secondary-btn" onClick={handleResend} style={{ marginTop: '10px' }}>
+                    <button className="secondary-btn" onClick={handleResend}>
                         인증 메일 재발송
                     </button>
-                    <button className="login-btn" onClick={onLogout} style={{ marginTop: '20px', width: '100%' }}>
+                    <button className="login-btn-ghost" onClick={onLogout}>
                         로그아웃 및 돌아가기
                     </button>
                 </div>
@@ -412,17 +412,22 @@ function App() {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
 
-                // Update profile with nickname
-                await updateProfile(user, { displayName: nickname });
+                // Try to update profile and DB, but don't block registration on failure
+                try {
+                    // Update profile with nickname
+                    await updateProfile(user, { displayName: nickname });
 
-                // Save user info to Firestore
-                await setDoc(doc(db, "users", user.uid), {
-                    uid: user.uid,
-                    email: user.email,
-                    nickname: nickname,
-                    isAdmin: false,
-                    createdAt: new Date().toISOString()
-                });
+                    // Save user info to Firestore
+                    await setDoc(doc(db, "users", user.uid), {
+                        uid: user.uid,
+                        email: user.email,
+                        nickname: nickname,
+                        isAdmin: false,
+                        createdAt: new Date().toISOString()
+                    });
+                } catch (dbError) {
+                    console.error("Profile/DB update failed (non-critical):", dbError);
+                }
 
                 await sendEmailVerification(user);
                 alert("인증 메일이 발송되었습니다. 이메일을 확인 후 다시 로그인해주세요.");
