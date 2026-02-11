@@ -69,7 +69,7 @@ function AuthModal({ isOpen, onClose, onGoogleLogin, onEmailAuth }) {
                 <h2>{isLogin ? "로그인" : "회원가입"}</h2>
 
                 <button className="google-auth-btn" onClick={onGoogleLogin}>
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="G" />
+                    <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" alt="G" />
                     Google로 계속하기
                 </button>
 
