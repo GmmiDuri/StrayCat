@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { db, auth, googleProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from './firebase';
-import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy, arrayUnion } from "firebase/firestore";
+import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy, arrayUnion, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { translations } from './translations';
 import 'leaflet/dist/leaflet.css';
@@ -15,7 +15,7 @@ import './index.css';
 // Proj4 definitions for Korean Coordinate systems
 // Most public data in GRS80 Central uses False E/N: 200000, 500000 (or 600000)
 // il-gok hospital in Gwangju (~126.9E, 35.2N) matches 200k/500k origin.
-proj4.defs("EPSG:5181", "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +units=m +no_defs");
+proj4.defs("EPSG:5181", "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs");
 const wgs84 = "EPSG:4326";
 const utmk = "EPSG:5181";
 
@@ -60,17 +60,113 @@ function IntroSection({ catsCount, onLoginClick }) {
     );
 }
 
+// Email Verification Guard Section
+function VerificationGuard({ user, onLogout }) {
+    const handleReload = async () => {
+        await user.reload();
+        window.location.reload(); // Refresh to trigger re-render with updated user state
+    };
+
+    const handleResend = async () => {
+        try {
+            await sendEmailVerification(user);
+            alert("인증 메일이 재발송되었습니다. 메일함을 확인해주세요.");
+        } catch (error) {
+            console.error("Error resending email:", error);
+            alert("메일 발송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+        }
+    };
+
+    return (
+        <div className="verification-guard">
+            <div className="guard-content">
+                <div className="guard-icon">✉️</div>
+                <h2>이메일 인증이 필요합니다</h2>
+                <p>
+                    {user.email} 주소로 보낸 인증 메일을 확인하고 <br />
+                    링크를 클릭해 인증을 완료해 주세요. <br />
+                    <strong>스팸함도 꼭 확인해 주세요!</strong>
+                </p>
+                <div className="guard-actions">
+                    <button className="submit-btn" onClick={handleReload}>
+                        새로고침 / 확인
+                    </button>
+                    <button className="secondary-btn" onClick={handleResend} style={{ marginTop: '10px' }}>
+                        인증 메일 재발송
+                    </button>
+                    <button className="login-btn" onClick={onLogout} style={{ marginTop: '20px', width: '100%' }}>
+                        로그아웃 및 돌아가기
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // Unified Auth Modal
 function AuthModal({ isOpen, onClose, onGoogleLogin, onEmailAuth }) {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [passwordConfirm, setPasswordConfirm] = useState('');
+    const [nickname, setNickname] = useState('');
+    const [nicknameChecked, setNicknameChecked] = useState(false);
+    const [nicknameMsg, setNicknameMsg] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) {
+            setEmail('');
+            setPassword('');
+            setPasswordConfirm('');
+            setNickname('');
+            setNicknameChecked(false);
+            setNicknameMsg('');
+        }
+    }, [isOpen]);
+
+    const checkNickname = async () => {
+        if (!nickname || nickname.length < 2) {
+            setNicknameMsg("닉네임은 2자 이상 입력해주세요.");
+            return;
+        }
+
+        try {
+            const q = query(collection(db, "users"), where("nickname", "==", nickname));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                setNicknameMsg("이미 사용 중인 닉네임입니다.");
+                setNicknameChecked(false);
+            } else {
+                setNicknameMsg("사용 가능한 닉네임입니다.");
+                setNicknameChecked(true);
+            }
+        } catch (error) {
+            console.error("Error checking nickname:", error);
+            if (error.code === 'permission-denied') {
+                // This usually means Firebase rules are blocking unauthenticated reads
+                // For a safe 'duplication check', rules should allow read access to specific fields
+                setNicknameMsg("서버 권한 오류가 발생했습니다. (Firebase Rules 확인 필요)");
+            } else {
+                setNicknameMsg("중복 확인 중 오류가 발생했습니다.");
+            }
+        }
+    };
 
     if (!isOpen) return null;
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onEmailAuth(isLogin, email, password);
+        if (!isLogin) {
+            if (password !== passwordConfirm) {
+                alert("비밀번호가 일치하지 않습니다.");
+                return;
+            }
+            if (!nicknameChecked) {
+                alert("닉네임 중복 확인을 해주세요.");
+                return;
+            }
+        }
+        onEmailAuth(isLogin, email, password, nickname);
     };
 
     return (
@@ -97,6 +193,50 @@ function AuthModal({ isOpen, onClose, onGoogleLogin, onEmailAuth }) {
                         <label>비밀번호</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="6자리 이상" />
                     </div>
+
+                    {!isLogin && (
+                        <>
+                            <div className="form-group">
+                                <label>비밀번호 확인</label>
+                                <input type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} required placeholder="비밀번호 재입력" />
+                            </div>
+                            <div className="form-group">
+                                <label>닉네임</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                        type="text"
+                                        value={nickname}
+                                        onChange={(e) => {
+                                            setNickname(e.target.value);
+                                            setNicknameChecked(false);
+                                            setNicknameMsg('');
+                                        }}
+                                        required
+                                        placeholder="2자 이상"
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="nickname-check-btn"
+                                        onClick={checkNickname}
+                                    >
+                                        중복 확인
+                                    </button>
+                                </div>
+                                {nicknameMsg && (
+                                    <p style={{
+                                        fontSize: '12px',
+                                        marginTop: '4px',
+                                        color: nicknameChecked ? '#27ae60' : '#e74c3c',
+                                        textAlign: 'left'
+                                    }}>
+                                        {nicknameMsg}
+                                    </p>
+                                )}
+                            </div>
+                        </>
+                    )}
+
                     <button type="submit" className="submit-btn">
                         {isLogin ? "로그인" : "회원가입하기"}
                     </button>
@@ -263,14 +403,28 @@ function App() {
         }
     };
 
-    const handleEmailAuth = async (isLogin, email, password) => {
+    const handleEmailAuth = async (isLogin, email, password, nickname) => {
         try {
             if (isLogin) {
                 await signInWithEmailAndPassword(auth, email, password);
                 setShowAuthModal(false);
             } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                await sendEmailVerification(userCredential.user);
+                const user = userCredential.user;
+
+                // Update profile with nickname
+                await updateProfile(user, { displayName: nickname });
+
+                // Save user info to Firestore
+                await setDoc(doc(db, "users", user.uid), {
+                    uid: user.uid,
+                    email: user.email,
+                    nickname: nickname,
+                    isAdmin: false,
+                    createdAt: new Date().toISOString()
+                });
+
+                await sendEmailVerification(user);
                 alert("인증 메일이 발송되었습니다. 이메일을 확인 후 다시 로그인해주세요.");
                 await signOut(auth);
                 setShowAuthModal(false);
@@ -391,10 +545,18 @@ function App() {
 
         const hospitals = hospitalData.map(h => {
             if (h.lat && h.lng) {
-                // Convert UTM-K [lng_x, lat_y] to WGS84 [lng, lat]
-                // Warning: hospitals.json.json had 'lat' as UTM-K X and 'lng' as UTM-K Y
                 try {
                     const [convertedLng, convertedLat] = proj4(utmk, wgs84, [h.lat, h.lng]);
+
+                    // Validation Log for Il-gok Hospital
+                    if (h.name === "일곡동물병원") {
+                        console.log("Validation [일곡동물병원]:", {
+                            input: [h.lat, h.lng],
+                            output: [convertedLat, convertedLng],
+                            address: "광주광역시 북구 일곡동"
+                        });
+                    }
+
                     return { ...h, wgsLat: convertedLat, wgsLng: convertedLng };
                 } catch (e) {
                     return null;
@@ -815,6 +977,10 @@ function App() {
         );
     };
 
+    if (user && !user.emailVerified && user.providerData[0].providerId === 'password') {
+        return <VerificationGuard user={user} onLogout={handleLogout} />;
+    }
+
     return (
         <div className="app-container">
             <button className="lang-toggle" onClick={toggleLang}>
@@ -855,9 +1021,12 @@ function App() {
                                 ) : (
                                     <div className="user-avatar-placeholder">👤</div>
                                 )}
-                                <button className="login-btn" onClick={handleLogout} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
-                                    로그아웃
-                                </button>
+                                <div className="user-info-text">
+                                    <span className="user-name">{user.displayName || user.email.split('@')[0]}</span>
+                                    <button className="logout-link" onClick={handleLogout}>
+                                        로그아웃
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
