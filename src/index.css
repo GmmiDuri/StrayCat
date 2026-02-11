@@ -1038,3 +1038,45 @@ h1,
 .cat-date {
     font-family: 'NanumSquareNeo', sans-serif;
 }
+/* 비로그인 유저를 위한 블러 효과 */
+.blur-content {
+    filter: blur(5px);
+    user-select: none;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* 사이드바 로그인 버튼 */
+.login-btn {
+    background: white;
+    color: #242424;
+    border: 1px solid #ddd;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.login-btn:hover {
+    background: #f7f7f7;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid var(--main-color);
+}
+

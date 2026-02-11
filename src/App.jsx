@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { db } from './firebase';
+import { db, auth, googleProvider, signInWithPopup, signOut } from './firebase';
 import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy, arrayUnion } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { translations } from './translations';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
@@ -70,6 +71,36 @@ function App() {
     const [tempCoords, setTempCoords] = useState(null);
     const [editingId, setEditingId] = useState(null); // Track which cat is being edited
     const [lang, setLang] = useState('ko'); // Language state: 'ko' or 'en'
+
+    // Auth State
+    const [user, setUser] = useState(null);
+
+    // Auth Listener
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleLogin = async () => {
+        try {
+            await signInWithPopup(auth, googleProvider);
+        } catch (error) {
+            console.error("Login failed:", error);
+            alert("로그인 중 오류가 발생했습니다.");
+        }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            setSelectedCat(null); // Reset selection
+            // Optional: clear any other user-specific state if needed
+        } catch (error) {
+            console.error("Logout failed:", error);
+        }
+    };
 
     // Urgent Fix: Missing States
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -158,6 +189,10 @@ function App() {
     }, []);
 
     const handleManualAdd = () => {
+        if (!user) {
+            alert("로그인이 필요한 기능입니다.");
+            return;
+        }
         setIsAdding(true);
         setEditingId(null);
         setFormData({
@@ -294,7 +329,11 @@ function App() {
                     id: Date.now(),
                     lat: tempCoords.lat,
                     lng: tempCoords.lng,
-                    createdAt: new Date()
+                    lat: tempCoords.lat,
+                    lng: tempCoords.lng,
+                    createdAt: new Date(),
+                    userId: user.uid,
+                    userEmail: user.email
                 });
             }
             setShowModal(false);
@@ -321,89 +360,108 @@ function App() {
         }
     };
 
-    const renderCatDetails = (cat) => (
-        <div className="cat-details-content">
-            {cat.photo && <img src={cat.photo} alt={cat.name} className="cat-detail-img" />}
-            <h3>{cat.name}</h3>
-            <p className="cat-detail-meta">
-                {t.foundAt} {cat.foundDate} {cat.foundTime}
-            </p>
-            <p className="cat-detail-desc">{cat.desc}</p>
-            <div className="cat-badges">
-                <span className="badge">{t.status}: {cat.condition}</span>
-                <span className="badge">{t.tnr}: {cat.neutered}</span>
-            </div>
-            <div className="cat-needs-section">
-                {cat.needs && cat.needs !== '없음' && (
-                    <div className="needs-box">
-                        {cat.needs === '중성화 필요' || cat.needs === '즉시 치료 필요' ? (
-                            <>
-                                <span className="needs-urgent">{t.helpReq}</span>
-                                <div className="needs-text">
-                                    {cat.needs} ({cat.helpers || 0}{t.helpers})
-                                </div>
-                                {cat.helpersList && cat.helpersList.length > 0 && (
-                                    <div className="helpers-list">
-                                        <strong>{t.helpersList}</strong>
-                                        <ul>
-                                            {cat.helpersList.map((helper, idx) => (
-                                                <li key={idx}>{helper.phone}</li>
-                                            ))}
-                                        </ul>
+    const renderCatDetails = (cat) => {
+        const isBlur = !user;
+
+        return (
+            <div className={`cat-details-content ${isBlur ? 'blur-container' : ''}`}>
+                {cat.photo && <img src={cat.photo} alt={cat.name} className={`cat-detail-img ${isBlur ? 'blur-content' : ''}`} />}
+                <h3>{isBlur ? "로그인 후 확인 가능" : cat.name}</h3>
+
+                <div className={isBlur ? 'blur-content' : ''}>
+                    <p className="cat-detail-meta">
+                        {t.foundAt} {cat.foundDate} {cat.foundTime}
+                    </p>
+                    <p className="cat-detail-desc">{cat.desc}</p>
+                    <div className="cat-badges">
+                        <span className="badge">{t.status}: {cat.condition}</span>
+                        <span className="badge">{t.tnr}: {cat.neutered}</span>
+                    </div>
+                </div>
+
+                <div className={`cat-needs-section ${isBlur ? 'blur-content' : ''}`}>
+                    {cat.needs && cat.needs !== '없음' && (
+                        <div className="needs-box">
+                            {cat.needs === '중성화 필요' || cat.needs === '즉시 치료 필요' ? (
+                                <>
+                                    <span className="needs-urgent">{t.helpReq}</span>
+                                    <div className="needs-text">
+                                        {cat.needs} ({cat.helpers || 0}{t.helpers})
                                     </div>
-                                )}
-                                <button
-                                    onClick={() => handleOpenHelpModal(cat)}
-                                    className="action-btn help-btn"
-                                >
-                                    {t.btnHelp}
-                                </button>
-                            </>
-                        ) : cat.needs === '주기적 길냥이 집사 필요' ? (
-                            <>
-                                <span className="care-req-title">{t.careReq}</span>
-                                <div className="needs-text">
-                                    {cat.needs} ({cat.caretakers || 0}{t.careCount})
-                                </div>
-                                {cat.careHistory && cat.careHistory.length > 0 && (
-                                    <div
-                                        className="care-history"
-                                        onClick={() => setShowHistoryModal(true)}
-                                        style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                                    {cat.helpersList && cat.helpersList.length > 0 && (
+                                        <div className="helpers-list">
+                                            <strong>{t.helpersList}</strong>
+                                            <ul>
+                                                {cat.helpersList.map((helper, idx) => (
+                                                    <li key={idx}>{helper.phone}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => handleOpenHelpModal(cat)}
+                                        className="action-btn help-btn"
+                                        disabled={!user}
                                     >
-                                        {t.lastMeal} {cat.careHistory[cat.careHistory.length - 1].date} {cat.careHistory[cat.careHistory.length - 1].time}
+                                        {t.btnHelp}
+                                    </button>
+                                </>
+                            ) : cat.needs === '주기적 길냥이 집사 필요' ? (
+                                <>
+                                    <span className="care-req-title">{t.careReq}</span>
+                                    <div className="needs-text">
+                                        {cat.needs} ({cat.caretakers || 0}{t.careCount})
                                     </div>
-                                )}
-                                <button
-                                    onClick={() => handleOpenCareModal(cat)}
-                                    className="action-btn care-btn"
-                                >
-                                    {t.btnRecordCare}
-                                </button>
-                            </>
-                        ) : cat.needs === '직접 입력' ? (
-                            <>
-                                <strong>{t.otherNeeds}</strong> {cat.customNeeds}
-                            </>
-                        ) : (
-                            <span>{cat.needs}</span>
-                        )}
+                                    {cat.careHistory && cat.careHistory.length > 0 && (
+                                        <div
+                                            className="care-history"
+                                            onClick={() => user && setShowHistoryModal(true)}
+                                            style={{ cursor: user ? 'pointer' : 'default', textDecoration: user ? 'underline' : 'none' }}
+                                        >
+                                            {t.lastMeal} {cat.careHistory[cat.careHistory.length - 1].date} {cat.careHistory[cat.careHistory.length - 1].time}
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => handleOpenCareModal(cat)}
+                                        className="action-btn care-btn"
+                                        disabled={!user}
+                                    >
+                                        {t.btnRecordCare}
+                                    </button>
+                                </>
+                            ) : cat.needs === '직접 입력' ? (
+                                <>
+                                    <strong>{t.otherNeeds}</strong> {cat.customNeeds}
+                                </>
+                            ) : (
+                                <span>{cat.needs}</span>
+                            )}
+                        </div>
+                    )}
+                </div>
+                {cat.phone && (
+                    <div className={`contact-box ${isBlur ? 'blur-content' : ''}`}>
+                        📞 {cat.phone}
+                    </div>
+                )}
+
+                {user && (
+                    <button
+                        onClick={() => handleEdit(cat)}
+                        className="edit-btn"
+                    >
+                        {t.btnEdit}
+                    </button>
+                )}
+
+                {!user && (
+                    <div className="login-overlay-message" style={{ textAlign: 'center', marginTop: '10px', color: '#666', fontSize: '0.9rem' }}>
+                        <p>상세 정보를 보려면 로그인이 필요합니다.</p>
                     </div>
                 )}
             </div>
-            {cat.phone && (
-                <div className="contact-box">
-                    📞 {cat.phone}
-                </div>
-            )}
-            <button
-                onClick={() => handleEdit(cat)}
-                className="edit-btn"
-            >
-                {t.btnEdit}
-            </button>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="app-container">
@@ -414,8 +472,29 @@ function App() {
             {/* Sidebar (Desktop Only via CSS) */}
             <aside className="sidebar">
                 <div className="sidebar-header">
-                    <h1>{t.appTitle}</h1>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h1 style={{ margin: 0 }}>{t.appTitle}</h1>
+                        {!user ? (
+                            <button className="login-btn" onClick={handleLogin}>
+                                <span>G</span> 구글 로그인
+                            </button>
+                        ) : (
+                            <div className="user-profile">
+                                {user.photoURL && <img src={user.photoURL} alt="Profile" className="user-avatar" />}
+                                <button className="login-btn" onClick={handleLogout} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+                                    로그아웃
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <p>{t.headerDescDefault}</p>
+                    {user && (
+                        <div style={{ marginTop: '10px' }}>
+                            <button className="filter-my-btn" onClick={() => setCatSearchQuery(prev => prev === 'MY_CATS' ? '' : 'MY_CATS')}>
+                                {catSearchQuery === 'MY_CATS' ? '전체 보기' : '내 기록 보기'}
+                            </button>
+                        </div>
+                    )}
                     <div className="sidebar-search">
                         <input
                             type="text"
@@ -427,7 +506,12 @@ function App() {
                 </div>
                 <div className="cat-list">
                     {cats
-                        .filter(cat => cat.name.toLowerCase().includes(catSearchQuery.toLowerCase()))
+                        .filter(cat => {
+                            if (catSearchQuery === 'MY_CATS') {
+                                return user && cat.userId === user.uid;
+                            }
+                            return cat.name.toLowerCase().includes(catSearchQuery.toLowerCase());
+                        })
                         .map(cat => (
                             <div key={cat.id} className="cat-card" onClick={() => setSelectedCat(cat)}>
                                 <div className="cat-info-row">
@@ -459,11 +543,17 @@ function App() {
                                 )}
                             </div>
                         ))}
-                    {cats.filter(cat => cat.name.toLowerCase().includes(catSearchQuery.toLowerCase())).length === 0 && (
-                        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-                            {lang === 'en' ? 'No cats found.' : '검색 결과가 없습니다.'}
-                        </div>
-                    )}
+
+                    {cats.filter(cat => {
+                        if (catSearchQuery === 'MY_CATS') {
+                            return user && cat.userId === user.uid;
+                        }
+                        return cat.name.toLowerCase().includes(catSearchQuery.toLowerCase());
+                    }).length === 0 && (
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                                {lang === 'en' ? 'No cats found.' : '검색 결과가 없습니다.'}
+                            </div>
+                        )}
                 </div>
             </aside>
 
@@ -471,7 +561,7 @@ function App() {
                 <MapContainer
                     center={[37.5708, 126.9801]}
                     zoom={17}
-                    minZoom={15}
+                    minZoom={7}
                     maxBounds={[[33, 124], [43, 132]]}
                     id="map-container"
                     className={isAdding ? 'cursor-crosshair' : ''}
