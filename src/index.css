@@ -1312,6 +1312,35 @@ h1,
     background: var(--main-color);
 }
 
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2005;
+    width: 20px;
+    height: 60px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    border-left: none;
+}
+
+.sidebar-toggle-btn:hover {
+    background: #f8f9fa;
+    color: var(--main-color);
+}
+
+.sidebar-toggle-btn.collapsed {
+    left: 0;
+}
+
 .map-section {
     flex: 1;
     height: 100%;

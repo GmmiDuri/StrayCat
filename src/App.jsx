@@ -346,6 +346,7 @@ function App() {
     const [tempCoords, setTempCoords] = useState(null);
     const [editingId, setEditingId] = useState(null); // Track which cat is being edited
     const [lang, setLang] = useState('ko'); // Language state: 'ko' or 'en'
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(350);
     const isResizing = useRef(false);
 
@@ -1103,10 +1104,25 @@ function App() {
                 {lang === 'ko' ? 'English' : '한국어'}
             </button>
 
+            {/* Resizer Toggle Button */}
+            <button
+                className={`sidebar-toggle-btn ${isSidebarCollapsed ? 'collapsed' : ''}`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSidebarCollapsed(!isSidebarCollapsed);
+                }}
+                style={{
+                    left: isSidebarCollapsed ? '0' : `${sidebarWidth}px`
+                }}
+                title={isSidebarCollapsed ? "사이드바 열기" : "사이드바 닫기"}
+            >
+                {isSidebarCollapsed ? '▶' : '◀'}
+            </button>
+
             {/* Sidebar */}
             <aside
-                className="sidebar"
-                style={{ width: sidebarWidth }}
+                className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
+                style={{ width: isSidebarCollapsed ? 0 : sidebarWidth }}
             >
                 <div className="sidebar-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
