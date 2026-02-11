@@ -329,8 +329,6 @@ function App() {
                     id: Date.now(),
                     lat: tempCoords.lat,
                     lng: tempCoords.lng,
-                    lat: tempCoords.lat,
-                    lng: tempCoords.lng,
                     createdAt: new Date(),
                     userId: user.uid,
                     userEmail: user.email
