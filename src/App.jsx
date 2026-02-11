@@ -1,6 +1,20 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { db, auth, googleProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from './firebase';
 import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { translations } from './translations';
+import 'leaflet/dist/leaflet.css';
+import './index.css';
+
+// Custom Marker Icon
+const catIcon = new L.DivIcon({
+    className: 'custom-cat-icon',
+    html: `<div style="background: white; border: 2px solid #FFD700; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">🐱</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+});
 
 // Intro Section for Guest Users
 function IntroSection({ catsCount, onLoginClick }) {
@@ -146,6 +160,7 @@ function App() {
 
     // Auth State
     const [user, setUser] = useState(null);
+    const [showAuthModal, setShowAuthModal] = useState(false);
 
     // Auth Listener
     useEffect(() => {
