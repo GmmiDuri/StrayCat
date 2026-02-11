@@ -1312,8 +1312,6 @@ h1,
     background: var(--main-color);
 }
 
-color: var(--main-color);
-
 .map-section {
     flex: 1;
     height: 100%;
