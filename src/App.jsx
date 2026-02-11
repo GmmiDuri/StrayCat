@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { db, auth, googleProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from './firebase';
-import { collection, addDoc, getDocs, updateDoc, doc, onSnapshot, query, orderBy, arrayUnion, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, getDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, arrayUnion, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { translations } from './translations';
 import 'leaflet/dist/leaflet.css';
@@ -347,7 +347,6 @@ function App() {
     const [editingId, setEditingId] = useState(null); // Track which cat is being edited
     const [lang, setLang] = useState('ko'); // Language state: 'ko' or 'en'
     const [sidebarWidth, setSidebarWidth] = useState(350);
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const isResizing = useRef(false);
 
     // TF.js Model State
@@ -372,6 +371,34 @@ function App() {
         });
         return () => unsubscribe();
     }, []);
+
+    const [userNickname, setUserNickname] = useState('');
+
+    useEffect(() => {
+        const fetchNickname = async () => {
+            if (user) {
+                if (user.displayName) {
+                    setUserNickname(user.displayName);
+                } else {
+                    // Fallback to Firestore if displayName is missing
+                    try {
+                        const userDoc = await getDoc(doc(db, "users", user.uid));
+                        if (userDoc.exists()) {
+                            setUserNickname(userDoc.data().nickname);
+                        } else {
+                            setUserNickname(user.email.split('@')[0]);
+                        }
+                    } catch (error) {
+                        console.error("Error fetching nickname:", error);
+                        setUserNickname(user.email.split('@')[0]);
+                    }
+                }
+            } else {
+                setUserNickname('');
+            }
+        };
+        fetchNickname();
+    }, [user]);
 
     // TF.js Model Loading
     useEffect(() => {
@@ -402,6 +429,24 @@ function App() {
             alert(msg);
         }
     };
+
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    useEffect(() => {
+        const checkAdmin = async () => {
+            if (user) {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.exists() && userDoc.data().isAdmin) {
+                    setIsAdmin(true);
+                } else {
+                    setIsAdmin(false);
+                }
+            } else {
+                setIsAdmin(false);
+            }
+        };
+        checkAdmin();
+    }, [user]);
 
     const handleEmailAuth = async (isLogin, email, password, nickname) => {
         try {
@@ -783,6 +828,53 @@ function App() {
         setShowCareModal(true);
     };
 
+    const handleDelete = async (catId) => {
+        if (!window.confirm("정말로 이 길냥이 정보를 삭제하시겠습니까?")) return;
+
+        try {
+            // Find the firestoreId using the catId
+            const catToDelete = cats.find(c => c.id === catId);
+            if (catToDelete && catToDelete.firestoreId) {
+                // Check if user is owner or admin
+                const isOwner = user && user.uid === catToDelete.uid;
+                // We need to fetch the current user's admin status from Firestore if not in user object
+                let isAdmin = false;
+                if (user) {
+                    // For now, check if user email is in a hardcoded admin list or fetch from DB
+                    // Since we save isAdmin in Firestore, let's trust the loaded profile or re-fetch
+                    // Ideally, we should have isAdmin in the user state. 
+                    // Let's check the local state approach or just allow if user.email matches specific admins
+                    // OR better, we need to fetch the user doc to confirm admin status if not present
+                }
+
+                // Simplified Admin Check: Check against current user data logic
+                // In handleEmailAuth we set isAdmin: false.
+                // Let's assume we need to fetch user doc to be sure, or check a list.
+                // For this request, I'll implement a fetch check for admin status for safety.
+
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists() && userDocSnap.data().isAdmin) {
+                    isAdmin = true;
+                }
+
+                if (isOwner || isAdmin) {
+                    await deleteDoc(doc(db, "cats", catToDelete.firestoreId));
+                    alert("삭제되었습니다.");
+                    setSelectedCat(null);
+                } else {
+                    alert("삭제 권한이 없습니다.");
+                }
+            } else {
+                console.error("Cat not found or firestoreId missing for deletion:", catId);
+                alert("삭제할 고양이를 찾을 수 없습니다.");
+            }
+        } catch (error) {
+            console.error("Error deleting cat:", error);
+            alert("삭제 중 오류가 발생했습니다.");
+        }
+    };
+
     const handleSubmitCare = async (e) => {
         e.preventDefault();
         if (!currentCat) return;
@@ -808,6 +900,25 @@ function App() {
     const handleSubmit = async (e, forceSubmit = false) => {
         if (e) e.preventDefault();
 
+        // Rate Limiting Check (24h limit)
+        if (user) {
+            const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const q = query(
+                collection(db, "cats"),
+                where("userId", "==", user.uid), // Changed from "uid" to "userId" based on addDoc
+                where("createdAt", ">=", yesterday) // Use Date object for comparison
+            );
+            const querySnapshot = await getDocs(q);
+            if (querySnapshot.size >= 2) {
+                alert("하루에 최대 2마리까지만 등록할 수 있습니다.");
+                return;
+            }
+        }
+
+        if (!tempCoords) { // Changed from selectedPosition to tempCoords
+            alert(t.alertLocation);
+            return;
+        }
         try {
             if (editingId) {
                 // 수정 모드
@@ -992,25 +1103,10 @@ function App() {
                 {lang === 'ko' ? 'English' : '한국어'}
             </button>
 
-            {/* Resizer Toggle Button */}
-            <button
-                className={`sidebar-toggle-btn ${isSidebarCollapsed ? 'collapsed' : ''}`}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setIsSidebarCollapsed(!isSidebarCollapsed);
-                }}
-                style={{
-                    left: isSidebarCollapsed ? '0' : `${sidebarWidth}px`
-                }}
-                title={isSidebarCollapsed ? "사이드바 열기" : "사이드바 닫기"}
-            >
-                {isSidebarCollapsed ? '▶' : '◀'}
-            </button>
-
             {/* Sidebar */}
             <aside
-                className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
-                style={{ width: isSidebarCollapsed ? 0 : sidebarWidth }}
+                className="sidebar"
+                style={{ width: sidebarWidth }}
             >
                 <div className="sidebar-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -1024,10 +1120,10 @@ function App() {
                                 {user.photoURL ? (
                                     <img src={user.photoURL} alt="Profile" className="user-avatar" />
                                 ) : (
-                                    <div className="user-avatar-placeholder">👤</div>
+                                    <div className="user-avatar-placeholder">🐱</div>
                                 )}
                                 <div className="user-info-text">
-                                    <span className="user-name">{user.displayName || user.email.split('@')[0]}</span>
+                                    <span className="user-name">{userNickname || (user.displayName || user.email.split('@')[0])}</span>
                                     <button className="logout-link" onClick={handleLogout}>
                                         로그아웃
                                     </button>
